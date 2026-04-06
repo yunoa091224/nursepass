@@ -10,7 +10,7 @@
 body{min-height:100vh;background:linear-gradient(135deg,#fffbf5 0%,#fff7ed 50%,#fef3c7 100%);font-family:'Noto Sans JP',sans-serif;padding:16px;position:relative;overflow-x:hidden}
 .blob{position:fixed;border-radius:50%;pointer-events:none;z-index:0}
 .blob1{width:400px;height:400px;top:-10%;right:-5%;background:radial-gradient(circle,rgba(255,200,150,0.3) 0%,transparent 70%);animation:float1 8s ease-in-out infinite}
-.blob2{width:350px;height:350px;bottom:-10%;left:-5%;background:radial-gradient(circle,rgba(182,200,255,0.25) 0%,transparent 70%);animation:float2 10s ease-in-out infinite}
+.blob2{width:350px;height:350px;bottom:-10%;left:-5%;background:radial-gradient(circle,rgba(255,200,150,0.25) 0%,transparent 70%);animation:float2 10s ease-in-out infinite}
 .wrap{max-width:520px;margin:0 auto;position:relative;z-index:1}
 
 /* NAV */
@@ -465,7 +465,7 @@ function answer(key){
     'ここで気づけてよかった！本番前に練習できて正解だよ。'
   ];
   const nmsg=correct?msgs_ok[Math.floor(Math.random()*msgs_ok.length)]:msgs_ng[Math.floor(Math.random()*msgs_ng.length)];
-  res.innerHTML=`<div class="result-label">${correct?'✓ 正解！':'✗ 不正解'}</div><div style="font-size:12px;color:${correct?'#166534':'#ea580c'};font-weight:600;margin:4px 0 6px;padding:4px 8px;background:${correct?'rgba(74,222,128,0.08)':'rgba(139,92,246,0.08)'};border-radius:8px">${nmsg}</div><div class="explanation">${q.explanation}</div>`;
+  res.innerHTML=`<div class="result-label">${correct?'✓ 正解！':'✗ 不正解'}</div><div style="font-size:12px;color:${correct?'#166534':'#ea580c'};font-weight:600;margin:4px 0 6px;padding:4px 8px;background:${correct?'rgba(74,222,128,0.08)':'rgba(249,115,22,0.08)'};border-radius:8px">${nmsg}</div><div class="explanation">${q.explanation}</div>`;
   choices.after(res);
   const mc=createMiniChat(q);
   res.after(mc);
@@ -657,7 +657,7 @@ function ansJok(key){
   var res=document.createElement('div');
   res.className='result-area '+(ok?'correct':'wrong');
   res.innerHTML='<div class="result-label">'+(ok?'✓ 正解！':'✗ 不正解')+'</div>'+
-    '<div style="font-size:12px;font-weight:600;margin:4px 0 6px;padding:4px 8px;border-radius:8px;background:'+(ok?'rgba(74,222,128,0.08)':'rgba(139,92,246,0.08)')+';color:'+(ok?'#166534':'#ea580c')+'">'+nmsg+'</div>'+
+    '<div style="font-size:12px;font-weight:600;margin:4px 0 6px;padding:4px 8px;border-radius:8px;background:'+(ok?'rgba(74,222,128,0.08)':'rgba(249,115,22,0.08)')+';color:'+(ok?'#166534':'#ea580c')+'">'+nmsg+'</div>'+
     '<div class="explanation">'+q.explanation+'</div>';
   ch2.after(res);
   var mc=createMiniChat(q);
