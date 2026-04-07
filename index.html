@@ -24,7 +24,7 @@ body{min-height:100vh;background:linear-gradient(135deg,#F5EFE8 0%,#EDE0D0 50%,#
 .logo{font-family:'Zen Kaku Gothic New',sans-serif;font-size:18px;font-weight:700;background:linear-gradient(135deg,#D9C5B2,#B8A090);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .logo-sub{font-size:10px;color:#5A5450;letter-spacing:.05em}
 .score-badge{margin-left:auto;background:rgba(255,255,255,0.8);border:1px solid rgba(85,80,77,0.25);border-radius:20px;padding:4px 12px;font-size:12px;color:#55504D}
-.score-badge span{font-weight:700;color:#D9C5B2}
+.score-badge span{font-weight:700;color:#55504D}
 
 /* TABS */
 .tabs{display:flex;gap:6px;margin-bottom:16px;background:rgba(255,255,255,0.82);border-radius:16px;padding:4px}
@@ -181,7 +181,7 @@ body{min-height:100vh;background:linear-gradient(135deg,#F5EFE8 0%,#EDE0D0 50%,#
     <button class="tab active" onclick="switchTab('home')">ホーム</button>
     <button class="tab" onclick="switchTab('weak')">苦手</button>
     <button class="tab" onclick="switchTab('stats')">記録</button>
-    <button class="tab" onclick="switchTab('noa')" style="color:#D9C5B2">ヒカリ</button>
+    <button class="tab" onclick="switchTab('noa')" style="color:#8A6A50;font-weight:700">ヒカリ</button>
   </div>
 
   <div id="tabHome">
@@ -365,10 +365,10 @@ function initChips(){
     c.appendChild(chip);
   }
 
-  makeLabel(c,'⭐ 必修科目','#D9C5B2');
+  makeLabel(c,'⭐ 必修科目','#6B5040');
   hisshuOrder.forEach(f=>makeChip(f,true));
 
-  makeLabel(c,'📚 一般・専門科目','#B8A090');
+  makeLabel(c,'📚 一般・専門科目','#6B5040');
   generalOrder.forEach(f=>makeChip(f,false));
 }
 
