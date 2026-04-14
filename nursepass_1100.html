@@ -159,6 +159,12 @@ body{min-height:100vh;background:linear-gradient(135deg,#F5EFE8 0%,#EDE0D0 50%,#
 .modal-input:focus{border-color:rgba(217,197,178,0.5)}
 .modal-btn{width:100%;padding:12px;background:linear-gradient(135deg,#D9C5B2,#B8A090);color:white;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;margin-bottom:8px}
 .modal-skip{width:100%;padding:8px;background:none;border:none;color:#5A5450;font-size:12px;cursor:pointer;font-family:'Noto Sans JP',sans-serif}
+.modal-del{width:100%;padding:6px;background:none;border:none;color:#f87171;font-size:11px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;margin-top:2px}
+.api-key-notice{background:rgba(248,113,113,.07);border:1px solid rgba(248,113,113,.22);border-radius:14px;padding:14px 16px;margin-bottom:12px;text-align:center}
+.api-key-notice-text{font-size:13px;color:#991b1b;line-height:1.7;margin-bottom:10px}
+.api-key-notice-btn{background:linear-gradient(135deg,#D9C5B2,#B8A090);color:white;border:none;border-radius:10px;padding:9px 20px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif}
+.noa-settings-btn{background:none;border:none;cursor:pointer;font-size:16px;padding:4px 6px;color:#8A6A50;border-radius:8px;transition:.15s}
+.noa-settings-btn:hover{background:rgba(138,106,80,0.1)}
 .noa-av-img{width:100%;height:100%;border-radius:50%;object-fit:contain;object-position:center center;display:block;background:#F5EFE8}
 /* 毎日の応援メッセージ */
 .daily-msg-card{background:linear-gradient(135deg,rgba(245,239,232,0.96),rgba(237,224,212,0.92));border:1.5px solid rgba(85,80,77,0.32);border-radius:20px;padding:14px 16px;margin-bottom:12px;display:flex;align-items:flex-start;gap:12px;box-shadow:0 2px 14px rgba(217,197,178,0.12);animation:fadein .5s ease}
@@ -249,7 +255,14 @@ body{min-height:100vh;background:linear-gradient(135deg,#F5EFE8 0%,#EDE0D0 50%,#
             <div class="noa-name">ヒカリ</div>
             <div class="noa-catchcopy">いつも隣でそっと照らすよ</div>
           </div>
-          <div class="noa-limit" id="noaLimit">本日 残り10回</div>
+          <div style="display:flex;align-items:center;gap:4px">
+            <div class="noa-limit" id="noaLimit">本日 残り10回</div>
+            <button class="noa-settings-btn" onclick="showApiKeyModal()" title="APIキー設定">⚙️</button>
+          </div>
+        </div>
+        <div id="noaKeyNotice" class="api-key-notice" style="display:none">
+          <div class="api-key-notice-text">🔑 APIキーが設定されていません。<br>ヒカリと話すには OpenAI APIキーが必要です。</div>
+          <button class="api-key-notice-btn" onclick="showApiKeyModal()">APIキーを設定する</button>
         </div>
         <div class="chat-history" id="chatHistory"></div>
         <div class="chat-input-row">
@@ -267,11 +280,12 @@ body{min-height:100vh;background:linear-gradient(135deg,#F5EFE8 0%,#EDE0D0 50%,#
 <!-- APIキー入力モーダル -->
 <div class="modal-overlay" id="apiKeyModal" style="display:none">
   <div class="modal-card">
-    <div class="modal-title">🌸 OpenAI APIキーを設定</div>
-    <div class="modal-desc">ヒカリとお話しするには、OpenAI APIキーが必要です。<br>キーはあなたのブラウザにのみ保存され、外部には送信されません。<br><br>APIキーは <strong>platform.openai.com</strong> で取得できます。</div>
-    <input class="modal-input" id="apiKeyInput" type="password" placeholder="sk-..." />
+    <div class="modal-title" id="apiModalTitle">🌸 OpenAI APIキーを設定</div>
+    <div class="modal-desc" id="apiModalDesc">ヒカリとお話しするには、OpenAI APIキーが必要です。<br>キーはあなたのブラウザにのみ保存され、外部には送信されません。<br><br>APIキーは <strong>platform.openai.com</strong> で取得できます。</div>
+    <input class="modal-input" id="apiKeyInput" type="password" placeholder="sk-..." autocomplete="off" />
     <button class="modal-btn" onclick="saveApiKey()">保存して始める</button>
-    <button class="modal-skip" onclick="skipApiKey()">あとで設定する</button>
+    <button class="modal-skip" id="apiSkipBtn" onclick="skipApiKey()">あとで設定する</button>
+    <button class="modal-del" id="apiDelBtn" onclick="deleteApiKey()" style="display:none">⚠ 現在のキーを削除する</button>
   </div>
 </div>
 
@@ -995,8 +1009,7 @@ function initChat(){
     pushChatMsg('noa','こんにちは。ヒカリだよ。\n勉強のこと、不安なこと、何でも話してね。\nそっと一緒に考えるから。');
   }
   renderChat();
-  const key=localStorage.getItem('np_openai_key');
-  if(!key) showApiKeyModal();
+  updateApiKeyState();
 }
 function pushChatMsg(role,text){
   chatHistory.push({role,text});
@@ -1068,21 +1081,60 @@ async function sendChat(){
   }
   btn.disabled=false;
 }
+function updateApiKeyState(){
+  const key=localStorage.getItem('np_openai_key');
+  const notice=document.getElementById('noaKeyNotice');
+  const input=document.getElementById('chatInput');
+  const btn=document.getElementById('chatSendBtn');
+  if(!key){
+    if(notice) notice.style.display='block';
+    if(input){input.disabled=true;input.placeholder='APIキーを設定してください';}
+    if(btn) btn.disabled=true;
+  } else {
+    if(notice) notice.style.display='none';
+    if(input){input.disabled=false;input.placeholder='ヒカリに相談する...';}
+    if(btn) btn.disabled=false;
+  }
+}
 function showApiKeyModal(){
+  const key=localStorage.getItem('np_openai_key');
+  const title=document.getElementById('apiModalTitle');
+  const desc=document.getElementById('apiModalDesc');
+  const skipBtn=document.getElementById('apiSkipBtn');
+  const delBtn=document.getElementById('apiDelBtn');
+  if(key){
+    title.textContent='⚙️ APIキーを変更';
+    desc.innerHTML='新しいAPIキーを入力してください。<br>キーはあなたのブラウザにのみ保存されます。';
+    if(skipBtn) skipBtn.textContent='変更せずに閉じる';
+    if(delBtn) delBtn.style.display='block';
+  } else {
+    title.textContent='🌸 OpenAI APIキーを設定';
+    desc.innerHTML='ヒカリとお話しするには、OpenAI APIキーが必要です。<br>キーはあなたのブラウザにのみ保存され、外部には送信されません。<br><br>APIキーは <strong>platform.openai.com</strong> で取得できます。';
+    if(skipBtn) skipBtn.textContent='あとで設定する';
+    if(delBtn) delBtn.style.display='none';
+  }
+  document.getElementById('apiKeyInput').value='';
   document.getElementById('apiKeyModal').style.display='flex';
 }
 function saveApiKey(){
   const key=document.getElementById('apiKeyInput').value.trim();
   if(!key.startsWith('sk-')){alert('APIキーは「sk-」から始まる文字列を入力してください。');return;}
   localStorage.setItem('np_openai_key',key);
+  localStorage.setItem('np_api_seen','1');
   document.getElementById('apiKeyModal').style.display='none';
   document.getElementById('apiKeyInput').value='';
+  updateApiKeyState();
 }
 function skipApiKey(){
+  localStorage.setItem('np_api_seen','1');
   document.getElementById('apiKeyModal').style.display='none';
-  if(chatHistory.length<=1){
-    pushChatMsg('noa','APIキーがないと、ヒカリはうまくお話しできないの。\n「ヒカリ」タブを開いたときにまた設定できるよ。');
-  }
+  updateApiKeyState();
+}
+function deleteApiKey(){
+  if(!confirm('APIキーを削除しますか？\nヒカリとのチャットが使えなくなります。')) return;
+  localStorage.removeItem('np_openai_key');
+  document.getElementById('apiKeyModal').style.display='none';
+  updateApiKeyState();
 }
 
 // 毎日の応援メッセージ
@@ -1493,6 +1545,11 @@ function initDailyMessage(){
   document.getElementById('dailyMsgText').textContent=msg;
   document.getElementById('dailyMsgDate').textContent=`${m}月${d}日`;
   document.getElementById('dailyMsgCountdown').textContent=diffDays>0?`国試まで${diffDays}日、一緒に頑張ろう✨`:'今日も一歩ずつ、一緒に歩いていこう✨';
+}
+
+// 初回起動時APIキーモーダル（キー未設定かつ初回のみ）
+if(!localStorage.getItem('np_openai_key') && !localStorage.getItem('np_api_seen')){
+  setTimeout(showApiKeyModal, 900);
 }
 
 // INIT
