@@ -187,6 +187,16 @@ body{min-height:100vh;background:linear-gradient(135deg,#F5EFE8 0%,#EDE0D0 50%,#
 .cal-confirm{width:100%;padding:13px;background:linear-gradient(135deg,#4285F4,#1a73e8);color:white;border:none;border-radius:14px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;margin-top:4px;letter-spacing:.3px}
 .cal-cancel{width:100%;padding:10px;background:transparent;color:#aaa;border:none;font-size:13px;cursor:pointer;margin-top:4px;font-family:'Noto Sans JP',sans-serif}
 .cal-home-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:13px;background:rgba(66,133,244,0.08);color:#3367D6;border:1.5px solid rgba(66,133,244,0.2);border-radius:14px;font-size:14px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;margin-top:12px;font-weight:600;grid-column:1/-1}
+/* ホームサマリー */
+.home-summary{display:flex;gap:8px;margin-bottom:12px}
+.summary-card{flex:1;background:rgba(255,255,255,0.88);border:1px solid rgba(85,80,77,0.15);border-radius:14px;padding:10px 6px;text-align:center}
+.summary-val{font-size:20px;font-weight:700;color:#B8907A;line-height:1.1}
+.summary-lbl{font-size:9px;color:#5A5450;margin-top:3px}
+/* 週間グラフ */
+.week-chart{display:flex;gap:4px;align-items:flex-end;height:54px;padding:0 2px}
+.week-bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px}
+.week-bar{width:100%;border-radius:4px 4px 0 0;min-height:2px;transition:.4s}
+.week-lbl{font-size:9px;color:#5A5450}
 </style>
 </head>
 <body>
@@ -219,6 +229,11 @@ body{min-height:100vh;background:linear-gradient(135deg,#F5EFE8 0%,#EDE0D0 50%,#
           <span class="daily-msg-countdown" id="dailyMsgCountdown"></span>
         </div>
       </div>
+    </div>
+    <div class="home-summary">
+      <div class="summary-card"><div class="summary-val" id="streakDisp">0</div><div class="summary-lbl">🔥 連続学習日</div></div>
+      <div class="summary-card"><div class="summary-val" id="todayDisp">0</div><div class="summary-lbl">📝 今日の問題数</div></div>
+      <div class="summary-card"><div class="summary-val" id="coverDisp">0%</div><div class="summary-lbl">✅ カバー率</div></div>
     </div>
     <div class="card">
       <div class="sub-tabs">
@@ -302,7 +317,42 @@ let session = null;
 let history = JSON.parse(localStorage.getItem('np_history')||'{}');
 // history[id] = {correct:n, wrong:n}
 
+let streakData = JSON.parse(localStorage.getItem('np_streak')||'{"lastDate":"","streak":0}');
+let weeklyData = JSON.parse(localStorage.getItem('np_weekly')||'{}');
+const todayKey = new Date().toISOString().slice(0,10);
+
 function save(){localStorage.setItem('np_history',JSON.stringify(history))}
+
+function updateDailyStats(){
+  weeklyData[todayKey]=(weeklyData[todayKey]||0)+1;
+  // 過去14日分だけ保持
+  const wkeys=Object.keys(weeklyData).sort();
+  while(wkeys.length>14){delete weeklyData[wkeys.shift()];}
+  // ストリーク更新
+  if(streakData.lastDate!==todayKey){
+    const yest=new Date();yest.setDate(yest.getDate()-1);
+    const yKey=yest.toISOString().slice(0,10);
+    if(streakData.lastDate===yKey) streakData.streak+=1;
+    else streakData.streak=1;
+    streakData.lastDate=todayKey;
+  }
+  localStorage.setItem('np_weekly',JSON.stringify(weeklyData));
+  localStorage.setItem('np_streak',JSON.stringify(streakData));
+  renderHomeSummary();
+}
+
+function renderHomeSummary(){
+  const streak=streakData.streak||0;
+  const today=weeklyData[todayKey]||0;
+  const attempted=Object.keys(history).length;
+  const coverPct=Math.round(attempted/QUESTIONS.length*100);
+  const sd=document.getElementById('streakDisp');
+  const td=document.getElementById('todayDisp');
+  const cd=document.getElementById('coverDisp');
+  if(sd) sd.textContent=streak;
+  if(td) td.textContent=today;
+  if(cd) cd.textContent=coverPct+'%';
+}
 
 function getRate(){
   const ids=Object.keys(history);
@@ -404,11 +454,13 @@ function initChips(){
 // MODE BUTTONS
 function initModeButtons(){
   const mg=document.getElementById('modeGrid');
+  const unreadBtn=`<button class="mode-btn" onclick="startQuiz('unread')" style="border-color:rgba(85,80,77,0.2);background:rgba(255,255,255,0.85)"><div class="mode-icon">✨</div><div class="mode-title">未解答10問</div><div class="mode-desc">まだ解いてない問題</div></button>`;
   if(currentCategory==='必修'){
     mg.innerHTML=`
       <button class="mode-btn" onclick="startQuiz('random')"><div class="mode-icon">🎲</div><div class="mode-title">ランダム5問</div><div class="mode-desc">まずここから</div></button>
       <button class="mode-btn" onclick="startQuiz('field')"><div class="mode-icon">📖</div><div class="mode-title">分野別</div><div class="mode-desc">選んだ分野のみ</div></button>
       <button class="mode-btn" onclick="startQuiz('weak')"><div class="mode-icon">💪</div><div class="mode-title">苦手強化</div><div class="mode-desc">間違えた問題</div></button>
+      ${unreadBtn}
       <button class="mode-btn" onclick="startQuiz('allcat')"><div class="mode-icon">🏃</div><div class="mode-title">100問一気</div><div class="mode-desc">本番形式</div></button>
       <button class="mode-btn" onclick="startQuiz('hisshu')" style="border-color:rgba(217,197,178,0.5);background:rgba(237,224,212,0.9);grid-column:1/-1"><div class="mode-icon">⭐</div><div class="mode-title">必修50問 本番形式</div><div class="mode-desc">合格ライン80%（40/50問）で合否判定</div></button>
       <button class="cal-home-btn" onclick="showCalModal()">📅 学習予定をGoogleカレンダーに追加</button>`;
@@ -418,6 +470,7 @@ function initModeButtons(){
       <button class="mode-btn" onclick="startQuiz('random')"><div class="mode-icon">🎲</div><div class="mode-title">ランダム5問</div><div class="mode-desc">まずここから</div></button>
       <button class="mode-btn" onclick="startQuiz('field')"><div class="mode-icon">📖</div><div class="mode-title">分野別</div><div class="mode-desc">選んだ分野のみ</div></button>
       <button class="mode-btn" onclick="startQuiz('weak')"><div class="mode-icon">💪</div><div class="mode-title">苦手強化</div><div class="mode-desc">間違えた問題</div></button>
+      ${unreadBtn}
       <button class="mode-btn" onclick="startQuiz('allcat')"><div class="mode-icon">🏃</div><div class="mode-title">100問一気</div><div class="mode-desc">本番形式</div></button>
       <button class="mode-btn" onclick="startQuiz('ippan50')" style="border-color:rgba(217,197,178,0.5);background:rgba(237,224,212,0.9);grid-column:1/-1"><div class="mode-icon">📚</div><div class="mode-title">一般問題 50問演習</div><div class="mode-desc">11分野からバランスよく出題</div></button>
       <button class="cal-home-btn" onclick="showCalModal()">📅 学習予定をGoogleカレンダーに追加</button>`;
@@ -427,6 +480,7 @@ function initModeButtons(){
       <button class="mode-btn" onclick="startQuiz('random')"><div class="mode-icon">🎲</div><div class="mode-title">ランダム5問</div><div class="mode-desc">まずここから</div></button>
       <button class="mode-btn" onclick="startQuiz('field')"><div class="mode-icon">📖</div><div class="mode-title">分野別</div><div class="mode-desc">選んだ分野のみ</div></button>
       <button class="mode-btn" onclick="startQuiz('weak')"><div class="mode-icon">💪</div><div class="mode-title">苦手強化</div><div class="mode-desc">間違えた問題</div></button>
+      ${unreadBtn}
       <button class="mode-btn" onclick="startQuiz('allcat')"><div class="mode-icon">🏃</div><div class="mode-title">全問一気</div><div class="mode-desc">本番形式</div></button>
       <button class="mode-btn" onclick="startJokyoMode()" style="border-color:rgba(5,150,105,0.5);background:rgba(230,255,245,0.9);grid-column:1/-1"><div class="mode-icon">📋</div><div class="mode-title">状況設定 専用モード</div><div class="mode-desc">事例を1問ずつ、丁寧に解く</div></button>
       <button class="cal-home-btn" onclick="showCalModal()">📅 学習予定をGoogleカレンダーに追加</button>`;
@@ -448,6 +502,11 @@ function startQuiz(mode){
   else if(mode==='allcat') pool=shuffle([...catQ]).slice(0,100);
   else if(mode==='hisshu') pool=shuffle([...QUESTIONS.filter(q=>q.category==='必修')]).slice(0,50);
   else if(mode==='ippan50') pool=shuffle([...QUESTIONS.filter(q=>q.category==='一般')]).slice(0,50);
+  else if(mode==='unread'){
+    const answeredIds=new Set(Object.keys(history).map(Number));
+    pool=shuffle([...fieldFilter].filter(q=>!answeredIds.has(q.id))).slice(0,10);
+    if(!pool.length){alert('このカテゴリの問題はすべて解答済みです！\nすごい！カバー率100%です！');return;}
+  }
   if(!pool.length){alert('選択した分野に問題がありません。');return;}
   session={pool,idx:0,correct:0,wrong:0,mode};
   showQuiz();
@@ -497,6 +556,7 @@ function answer(key){
   else history[q.id].wrong++;
   save();
   updateScoreBadge();
+  updateDailyStats();
   if(correct) session.correct++; else session.wrong++;
 
   Object.keys(q.choices).forEach(k=>{
@@ -690,6 +750,7 @@ function backHome(){
   document.querySelectorAll('.sub-tab').forEach(b=>{
     b.classList.toggle('active',b.dataset.cat===currentCategory);
   });
+  renderHomeSummary();
 }
 
 // WEAK LIST
@@ -768,15 +829,33 @@ function renderStats(){
     return{f,t:c+w,rate:c+w?Math.round(c/(c+w)*100):null};
   }).filter(x=>x.t>0).sort((a,b)=>a.rate-b.rate);
 
+  // 週間グラフ
+  const weekDays=[];
+  for(let i=6;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);const k=d.toISOString().slice(0,10);const dn=['日','月','火','水','木','金','土'][d.getDay()];weekDays.push({k,dn,cnt:weeklyData[k]||0});}
+  const maxCnt=Math.max(...weekDays.map(d=>d.cnt),1);
+  const weekTotal=weekDays.reduce((s,d)=>s+d.cnt,0);
+  const weekChart=`<div style="margin-top:16px;text-align:left">
+    <div class="cat-stat-header">▸ 今週の学習数（合計${weekTotal}問）</div>
+    <div class="week-chart">
+      ${weekDays.map(d=>`<div class="week-bar-wrap">
+        <div class="week-bar" style="height:${Math.round(d.cnt/maxCnt*46)+2}px;background:${d.k===todayKey?'linear-gradient(180deg,#D9C5B2,#B8A090)':'rgba(217,197,178,0.45)'}"></div>
+        <div class="week-lbl">${d.dn}</div>
+      </div>`).join('')}
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:10px;color:#8A6A50;margin-top:4px"><span>🔥 連続${streakData.streak||0}日</span><span>今日: ${weeklyData[todayKey]||0}問</span></div>
+  </div>`;
+  const coverPct2=Math.round(total/QUESTIONS.length*100);
+
   sc.innerHTML=`
     <div class="result-big">${rate}%</div>
-    <div class="result-label2">解答${answered}問 / 学習済み${total}問</div>
+    <div class="result-label2">解答${answered}問 / 学習済み${total}問（カバー率${coverPct2}%）</div>
     <div style="display:flex;gap:8px;margin-top:12px">${catHtml}</div>
+    ${weekChart}
     ${fieldStats.length?`<div class="per-cat-stats" style="text-align:left">
       <div class="cat-stat-header">▸ 分野別正答率（苦手順）</div>
       ${fieldStats.map(x=>fieldBar(x.f)).join('')}
     </div>`:'<div style="color:#5A5450;font-size:13px;margin-top:16px">問題を解くと分野別データが表示されます</div>'}
-    <button onclick="if(confirm('記録をすべてリセットしますか？')){localStorage.removeItem('np_history');history={};updateScoreBadge();renderStats()}" style="margin-top:20px;background:none;border:none;color:#5A5450;font-size:11px;cursor:pointer;font-family:'Noto Sans JP',sans-serif">記録をリセット</button>`;
+    <button onclick="if(confirm('記録をすべてリセットしますか？')){localStorage.removeItem('np_history');localStorage.removeItem('np_streak');localStorage.removeItem('np_weekly');history={};streakData={lastDate:'',streak:0};weeklyData={};updateScoreBadge();renderStats();renderHomeSummary();}" style="margin-top:20px;background:none;border:none;color:#5A5450;font-size:11px;cursor:pointer;font-family:'Noto Sans JP',sans-serif">記録をリセット</button>`;
 }
 
 
@@ -1564,6 +1643,7 @@ initChips();
 initModeButtons();
 updateScoreBadge();
 initDailyMessage();
+renderHomeSummary();
 </script>
 </body>
 </html>
