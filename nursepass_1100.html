@@ -248,6 +248,7 @@ body{min-height:100vh;background:linear-gradient(135deg,#F5EFE8 0%,#EDE0D0 50%,#
       <div class="summary-card"><div class="summary-val" id="todayDisp">0</div><div class="summary-lbl">📝 今日の問題数</div></div>
       <div class="summary-card"><div class="summary-val" id="coverDisp">0%</div><div class="summary-lbl">✅ カバー率</div></div>
     </div>
+    <div style="text-align:center;font-size:12px;margin-bottom:10px" id="examCountdown"></div>
     <div class="search-wrap">
       <span style="font-size:16px;color:#aaa">🔍</span>
       <input class="search-input" id="searchInput" placeholder="問題を検索（キーワードで絞り込み）" oninput="onSearchInput(this.value)" autocomplete="off">
@@ -362,6 +363,29 @@ function toggleBookmark(id){
   const btn=document.getElementById('bmBtn'+id);
   if(btn) btn.textContent=bookmarks[id]?'🔖':'🤍';
   if(btn) btn.title=bookmarks[id]?'ブックマーク済み':'ブックマーク';
+}
+// 試験日カウントダウン
+let examDate=localStorage.getItem('np_examdate')||'';
+function getExamDays(){
+  if(!examDate) return null;
+  const d=new Date(examDate);
+  const now=new Date();
+  now.setHours(0,0,0,0);d.setHours(0,0,0,0);
+  return Math.ceil((d-now)/(1000*60*60*24));
+}
+function setExamDate(){
+  const v=prompt('試験日を入力してください（例: 2027-02-15）',examDate||'2027-02-15');
+  if(!v) return;
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(v)){alert('形式が違います。YYYY-MM-DDで入力してください。');return;}
+  examDate=v;localStorage.setItem('np_examdate',v);renderExamCountdown();
+}
+function renderExamCountdown(){
+  const el=document.getElementById('examCountdown');
+  if(!el) return;
+  const days=getExamDays();
+  if(days===null){el.innerHTML=`<span style="color:#8A6A50;cursor:pointer" onclick="setExamDate()">🎯 試験日を設定する</span>`;return;}
+  const color=days<=30?'#991b1b':days<=60?'#B8907A':'#16a34a';
+  el.innerHTML=`<span style="color:${color};font-weight:700;cursor:pointer" onclick="setExamDate()" title="クリックして変更">🎯 試験まであと <strong>${days}</strong>日</span>`;
 }
 
 function save(){localStorage.setItem('np_history',JSON.stringify(history))}
@@ -532,12 +556,14 @@ function initChips(){
 function initModeButtons(){
   const mg=document.getElementById('modeGrid');
   const unreadBtn=`<button class="mode-btn" onclick="startQuiz('unread')" style="border-color:rgba(85,80,77,0.2);background:rgba(255,255,255,0.85)"><div class="mode-icon">✨</div><div class="mode-title">未解答10問</div><div class="mode-desc">まだ解いてない問題</div></button>`;
+  const stars3Btn=`<button class="mode-btn" onclick="startQuiz('stars3')" style="border-color:rgba(217,197,178,0.5);background:rgba(255,248,220,0.9)"><div class="mode-icon">★★★</div><div class="mode-title">頻出問題20問</div><div class="mode-desc">最重要の必出問題</div></button>`;
   if(currentCategory==='必修'){
     mg.innerHTML=`
       <button class="mode-btn" onclick="startQuiz('random')"><div class="mode-icon">🎲</div><div class="mode-title">ランダム5問</div><div class="mode-desc">まずここから</div></button>
       <button class="mode-btn" onclick="startQuiz('field')"><div class="mode-icon">📖</div><div class="mode-title">分野別</div><div class="mode-desc">選んだ分野のみ</div></button>
       <button class="mode-btn" onclick="startQuiz('weak')"><div class="mode-icon">💪</div><div class="mode-title">苦手強化</div><div class="mode-desc">間違えた問題</div></button>
       ${unreadBtn}
+      ${stars3Btn}
       <button class="mode-btn" onclick="startQuiz('allcat')"><div class="mode-icon">🏃</div><div class="mode-title">100問一気</div><div class="mode-desc">本番形式</div></button>
       <button class="mode-btn" onclick="startQuiz('hisshu')" style="border-color:rgba(217,197,178,0.5);background:rgba(237,224,212,0.9);grid-column:1/-1"><div class="mode-icon">⭐</div><div class="mode-title">必修50問 本番形式</div><div class="mode-desc">合格ライン80%（40/50問）で合否判定</div></button>
       <button class="cal-home-btn" onclick="showCalModal()">📅 学習予定をGoogleカレンダーに追加</button>`;
@@ -548,6 +574,7 @@ function initModeButtons(){
       <button class="mode-btn" onclick="startQuiz('field')"><div class="mode-icon">📖</div><div class="mode-title">分野別</div><div class="mode-desc">選んだ分野のみ</div></button>
       <button class="mode-btn" onclick="startQuiz('weak')"><div class="mode-icon">💪</div><div class="mode-title">苦手強化</div><div class="mode-desc">間違えた問題</div></button>
       ${unreadBtn}
+      ${stars3Btn}
       <button class="mode-btn" onclick="startQuiz('allcat')"><div class="mode-icon">🏃</div><div class="mode-title">100問一気</div><div class="mode-desc">本番形式</div></button>
       <button class="mode-btn" onclick="startQuiz('ippan50')" style="border-color:rgba(217,197,178,0.5);background:rgba(237,224,212,0.9);grid-column:1/-1"><div class="mode-icon">📚</div><div class="mode-title">一般問題 50問演習</div><div class="mode-desc">11分野からバランスよく出題</div></button>
       <button class="cal-home-btn" onclick="showCalModal()">📅 学習予定をGoogleカレンダーに追加</button>`;
@@ -558,6 +585,7 @@ function initModeButtons(){
       <button class="mode-btn" onclick="startQuiz('field')"><div class="mode-icon">📖</div><div class="mode-title">分野別</div><div class="mode-desc">選んだ分野のみ</div></button>
       <button class="mode-btn" onclick="startQuiz('weak')"><div class="mode-icon">💪</div><div class="mode-title">苦手強化</div><div class="mode-desc">間違えた問題</div></button>
       ${unreadBtn}
+      ${stars3Btn}
       <button class="mode-btn" onclick="startQuiz('allcat')"><div class="mode-icon">🏃</div><div class="mode-title">全問一気</div><div class="mode-desc">本番形式</div></button>
       <button class="mode-btn" onclick="startJokyoMode()" style="border-color:rgba(5,150,105,0.5);background:rgba(230,255,245,0.9);grid-column:1/-1"><div class="mode-icon">📋</div><div class="mode-title">状況設定 専用モード</div><div class="mode-desc">事例を1問ずつ、丁寧に解く</div></button>
       <button class="cal-home-btn" onclick="showCalModal()">📅 学習予定をGoogleカレンダーに追加</button>`;
@@ -587,6 +615,10 @@ function startQuiz(mode){
   else if(mode==='bookmark'){
     pool=shuffle(Object.keys(bookmarks).map(id=>QUESTIONS.find(x=>x.id==id)).filter(Boolean));
     if(!pool.length){alert('ブックマーク済みの問題がありません。\n問題解答後に🤍ボタンで追加できます！');return;}
+  }
+  else if(mode==='stars3'){
+    pool=shuffle([...catQ].filter(q=>q.stars>=3)).slice(0,20);
+    if(!pool.length){alert('このカテゴリに頻出★★★問題がありません。');return;}
   }
   else if(mode==='mock'){
     // 本番模擬試験: 必修50問 + 一般60問 + 状況設定15問 = 125問
@@ -629,7 +661,7 @@ function renderQuestion(){
         <div class="q-progress"><div class="q-bar" style="width:${pct}%"></div></div>
         <div class="q-count">${session.idx+1}/${total}</div>
       </div>
-      <div class="q-field">${q.category} ▸ ${q.field}</div>
+      <div class="q-field" style="display:flex;justify-content:space-between;align-items:center">${q.category} ▸ ${q.field}<span style="color:#D9C5B2;font-size:12px;letter-spacing:1px">${'★'.repeat(q.stars||1)+'☆'.repeat(3-(q.stars||1))}</span></div>
       <div class="q-text">${q.question}</div>
       <div class="choices">
         ${Object.entries(q.choices).map(([k,v])=>`
@@ -874,6 +906,7 @@ function backHome(){
     b.classList.toggle('active',b.dataset.cat===currentCategory);
   });
   renderHomeSummary();
+  renderExamCountdown();
 }
 
 // WEAK LIST
@@ -1818,6 +1851,7 @@ initModeButtons();
 updateScoreBadge();
 initDailyMessage();
 renderHomeSummary();
+renderExamCountdown();
 </script>
 </body>
 </html>
