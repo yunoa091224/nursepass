@@ -210,6 +210,48 @@ body{min-height:100vh;background:linear-gradient(135deg,#F5EFE8 0%,#EDE0D0 50%,#
 /* ブックマーク */
 .bm-btn{background:none;border:none;cursor:pointer;font-size:18px;padding:4px 8px;border-radius:8px;transition:.15s;line-height:1}
 .bm-btn:hover{background:rgba(217,197,178,0.2)}
+/* ダークモード */
+body.dark{background:linear-gradient(135deg,#1a1614 0%,#251e1a 50%,#2a2018 100%)}
+body.dark .card{background:rgba(35,28,24,0.95);border-color:rgba(180,160,140,0.15)}
+body.dark .tabs{background:rgba(35,28,24,0.9)}
+body.dark .tab{color:#C8B8A8}
+body.dark .tab.active{background:linear-gradient(135deg,#8A6A50,#6B5040);color:white}
+body.dark .sub-tab{background:rgba(50,38,30,0.8);border-color:rgba(180,160,140,0.2);color:#C8B8A8}
+body.dark .sub-tab.active{background:linear-gradient(135deg,#8A6A50,#6B5040)}
+body.dark .mode-btn{background:rgba(50,38,30,0.9);border-color:rgba(180,160,140,0.2);color:#D8C8B8}
+body.dark .mode-title{color:#D8C8B8}
+body.dark .mode-desc{color:#A8988A}
+body.dark .q-text{color:#D8C8B8}
+body.dark .q-field{color:#A8988A}
+body.dark .choice-btn{background:rgba(50,38,30,0.85);border-color:rgba(180,160,140,0.25);color:#D8C8B8}
+body.dark .choice-btn:hover:not(:disabled){background:rgba(70,55,42,0.9)}
+body.dark .result-area.correct{background:rgba(74,222,128,0.08);border-color:rgba(74,222,128,0.2)}
+body.dark .result-area.wrong{background:rgba(248,113,113,0.07);border-color:rgba(248,113,113,0.18)}
+body.dark .explanation{color:#B0A090}
+body.dark .weak-item{background:rgba(50,38,30,0.8);border-color:rgba(180,160,140,0.18)}
+body.dark .weak-q{color:#D8C8B8}
+body.dark .weak-meta{color:#A8988A}
+body.dark .daily-msg-card{background:linear-gradient(135deg,rgba(45,35,28,0.96),rgba(55,42,32,0.92));border-color:rgba(180,160,140,0.25)}
+body.dark .daily-msg-text{color:#D8C8B8}
+body.dark .summary-card{background:rgba(40,30,24,0.9);border-color:rgba(180,160,140,0.15)}
+body.dark .summary-val{color:#D9A880}
+body.dark .summary-lbl{color:#A8988A}
+body.dark .search-wrap{background:rgba(40,30,24,0.9);border-color:rgba(180,160,140,0.15)}
+body.dark .search-input{color:#D8C8B8}
+body.dark .search-results{background:rgba(35,28,24,0.98);border-color:rgba(180,160,140,0.12)}
+body.dark .search-item{border-color:rgba(180,160,140,0.08)}
+body.dark .search-item:hover{background:rgba(60,46,36,0.8)}
+body.dark .search-q{color:#D8C8B8}
+body.dark .chip{background:rgba(50,38,30,0.9);border-color:rgba(180,160,140,0.25);color:#D8C8B8}
+body.dark .score-badge{background:rgba(40,30,24,0.9);border-color:rgba(180,160,140,0.2);color:#D8C8B8}
+body.dark #darkBtn{filter:invert(1) brightness(1.5)}
+/* フォントサイズ */
+body.font-lg .q-text{font-size:17px}
+body.font-lg .choice-btn{font-size:15px}
+body.font-lg .explanation{font-size:14px}
+body.font-xl .q-text{font-size:19px}
+body.font-xl .choice-btn{font-size:16px}
+body.font-xl .explanation{font-size:15px}
 </style>
 </head>
 <body>
@@ -221,7 +263,11 @@ body{min-height:100vh;background:linear-gradient(135deg,#F5EFE8 0%,#EDE0D0 50%,#
       <div class="logo">NursePass</div>
       <div class="logo-sub">看護師国試対策 - ヒカリ</div>
     </div>
-    <div class="score-badge">正答率 <span id="rateDisp">--%</span></div>
+    <div style="display:flex;align-items:center;gap:8px;margin-left:auto">
+      <div class="score-badge">正答率 <span id="rateDisp">--%</span></div>
+      <button onclick="toggleDark()" id="darkBtn" title="ダークモード" style="background:none;border:none;cursor:pointer;font-size:18px;padding:2px 4px;line-height:1;border-radius:8px;transition:.15s">🌙</button>
+      <button onclick="cycleFontSize()" id="fontBtn" title="文字サイズ" style="background:none;border:none;cursor:pointer;font-size:13px;padding:2px 6px;line-height:1;border-radius:8px;border:1px solid rgba(85,80,77,0.25);color:#5A5450;font-family:'Noto Sans JP',sans-serif">A</button>
+    </div>
   </div>
 
   <div class="tabs">
@@ -364,6 +410,22 @@ function toggleBookmark(id){
   if(btn) btn.textContent=bookmarks[id]?'🔖':'🤍';
   if(btn) btn.title=bookmarks[id]?'ブックマーク済み':'ブックマーク';
 }
+// ダークモード & フォントサイズ
+let isDark=localStorage.getItem('np_dark')==='1';
+let fontLevel=parseInt(localStorage.getItem('np_font')||'0');
+function applyTheme(){
+  document.body.classList.toggle('dark',isDark);
+  document.body.classList.remove('font-lg','font-xl');
+  if(fontLevel===1) document.body.classList.add('font-lg');
+  else if(fontLevel===2) document.body.classList.add('font-xl');
+  const db=document.getElementById('darkBtn');
+  const fb=document.getElementById('fontBtn');
+  if(db) db.textContent=isDark?'☀️':'🌙';
+  if(fb) fb.textContent=['A','A⁺','A⁺⁺'][fontLevel];
+}
+function toggleDark(){isDark=!isDark;localStorage.setItem('np_dark',isDark?'1':'0');applyTheme();}
+function cycleFontSize(){fontLevel=(fontLevel+1)%3;localStorage.setItem('np_font',fontLevel);applyTheme();}
+applyTheme();
 // 試験日カウントダウン
 let examDate=localStorage.getItem('np_examdate')||'';
 function getExamDays(){
