@@ -295,6 +295,7 @@ body.font-xl .explanation{font-size:15px}
       <div class="summary-card"><div class="summary-val" id="coverDisp">0%</div><div class="summary-lbl">✅ カバー率</div></div>
     </div>
     <div style="text-align:center;font-size:12px;margin-bottom:10px" id="examCountdown"></div>
+    <div style="background:rgba(255,255,255,0.85);border:1px solid rgba(85,80,77,0.15);border-radius:14px;padding:10px 14px;margin-bottom:10px" id="goalBar"></div>
     <div class="search-wrap">
       <span style="font-size:16px;color:#aaa">🔍</span>
       <input class="search-input" id="searchInput" placeholder="問題を検索（キーワードで絞り込み）" oninput="onSearchInput(this.value)" autocomplete="off">
@@ -409,6 +410,31 @@ function toggleBookmark(id){
   const btn=document.getElementById('bmBtn'+id);
   if(btn) btn.textContent=bookmarks[id]?'🔖':'🤍';
   if(btn) btn.title=bookmarks[id]?'ブックマーク済み':'ブックマーク';
+}
+// 今日の間違い・1日目標
+let todayWrong = JSON.parse(localStorage.getItem('np_today_wrong')||'{"date":"","ids":[]}');
+if(todayWrong.date!==todayKey) todayWrong={date:todayKey,ids:[]};
+let dailyGoal = parseInt(localStorage.getItem('np_goal')||'20');
+function saveTodayWrong(){localStorage.setItem('np_today_wrong',JSON.stringify(todayWrong));}
+function setDailyGoal(){
+  const v=prompt('1日の目標問題数を設定してください（5〜100）',dailyGoal);
+  const n=parseInt(v);
+  if(!n||n<5||n>100){return;}
+  dailyGoal=n;localStorage.setItem('np_goal',n);renderGoalBar();
+}
+function renderGoalBar(){
+  const el=document.getElementById('goalBar');
+  if(!el) return;
+  const today=weeklyData[todayKey]||0;
+  const pct=Math.min(Math.round(today/dailyGoal*100),100);
+  const done=today>=dailyGoal;
+  el.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+    <span style="font-size:11px;color:#8A6A50;font-weight:600">📌 今日の目標 <span style="cursor:pointer;text-decoration:underline" onclick="setDailyGoal()">${dailyGoal}問</span></span>
+    <span style="font-size:11px;color:${done?'#16a34a':'#B8907A'};font-weight:700">${today}/${dailyGoal}問 ${done?'✓ 達成！':''}</span>
+  </div>
+  <div style="height:6px;background:rgba(237,224,212,0.4);border-radius:10px;overflow:hidden">
+    <div style="width:${pct}%;height:100%;background:${done?'linear-gradient(90deg,#4ade80,#16a34a)':'linear-gradient(90deg,#D9C5B2,#B8A090)'};border-radius:10px;transition:.5s"></div>
+  </div>`;
 }
 // ダークモード & フォントサイズ
 let isDark=localStorage.getItem('np_dark')==='1';
@@ -619,6 +645,8 @@ function initModeButtons(){
   const mg=document.getElementById('modeGrid');
   const unreadBtn=`<button class="mode-btn" onclick="startQuiz('unread')" style="border-color:rgba(85,80,77,0.2);background:rgba(255,255,255,0.85)"><div class="mode-icon">✨</div><div class="mode-title">未解答10問</div><div class="mode-desc">まだ解いてない問題</div></button>`;
   const stars3Btn=`<button class="mode-btn" onclick="startQuiz('stars3')" style="border-color:rgba(217,197,178,0.5);background:rgba(255,248,220,0.9)"><div class="mode-icon">★★★</div><div class="mode-title">頻出問題20問</div><div class="mode-desc">最重要の必出問題</div></button>`;
+  const tw=todayWrong.ids.length;
+  const todayWrongBtn=tw>0?`<button class="mode-btn" onclick="startQuiz('today_wrong')" style="border-color:rgba(248,113,113,0.4);background:rgba(255,235,235,0.9)"><div class="mode-icon">🔄</div><div class="mode-title">今日の復習(${tw}問)</div><div class="mode-desc">今日間違えた問題</div></button>`:'';
   if(currentCategory==='必修'){
     mg.innerHTML=`
       <button class="mode-btn" onclick="startQuiz('random')"><div class="mode-icon">🎲</div><div class="mode-title">ランダム5問</div><div class="mode-desc">まずここから</div></button>
@@ -626,6 +654,7 @@ function initModeButtons(){
       <button class="mode-btn" onclick="startQuiz('weak')"><div class="mode-icon">💪</div><div class="mode-title">苦手強化</div><div class="mode-desc">間違えた問題</div></button>
       ${unreadBtn}
       ${stars3Btn}
+      ${todayWrongBtn}
       <button class="mode-btn" onclick="startQuiz('allcat')"><div class="mode-icon">🏃</div><div class="mode-title">100問一気</div><div class="mode-desc">本番形式</div></button>
       <button class="mode-btn" onclick="startQuiz('hisshu')" style="border-color:rgba(217,197,178,0.5);background:rgba(237,224,212,0.9);grid-column:1/-1"><div class="mode-icon">⭐</div><div class="mode-title">必修50問 本番形式</div><div class="mode-desc">合格ライン80%（40/50問）で合否判定</div></button>
       <button class="cal-home-btn" onclick="showCalModal()">📅 学習予定をGoogleカレンダーに追加</button>`;
@@ -637,6 +666,7 @@ function initModeButtons(){
       <button class="mode-btn" onclick="startQuiz('weak')"><div class="mode-icon">💪</div><div class="mode-title">苦手強化</div><div class="mode-desc">間違えた問題</div></button>
       ${unreadBtn}
       ${stars3Btn}
+      ${todayWrongBtn}
       <button class="mode-btn" onclick="startQuiz('allcat')"><div class="mode-icon">🏃</div><div class="mode-title">100問一気</div><div class="mode-desc">本番形式</div></button>
       <button class="mode-btn" onclick="startQuiz('ippan50')" style="border-color:rgba(217,197,178,0.5);background:rgba(237,224,212,0.9);grid-column:1/-1"><div class="mode-icon">📚</div><div class="mode-title">一般問題 50問演習</div><div class="mode-desc">11分野からバランスよく出題</div></button>
       <button class="cal-home-btn" onclick="showCalModal()">📅 学習予定をGoogleカレンダーに追加</button>`;
@@ -648,6 +678,7 @@ function initModeButtons(){
       <button class="mode-btn" onclick="startQuiz('weak')"><div class="mode-icon">💪</div><div class="mode-title">苦手強化</div><div class="mode-desc">間違えた問題</div></button>
       ${unreadBtn}
       ${stars3Btn}
+      ${todayWrongBtn}
       <button class="mode-btn" onclick="startQuiz('allcat')"><div class="mode-icon">🏃</div><div class="mode-title">全問一気</div><div class="mode-desc">本番形式</div></button>
       <button class="mode-btn" onclick="startJokyoMode()" style="border-color:rgba(5,150,105,0.5);background:rgba(230,255,245,0.9);grid-column:1/-1"><div class="mode-icon">📋</div><div class="mode-title">状況設定 専用モード</div><div class="mode-desc">事例を1問ずつ、丁寧に解く</div></button>
       <button class="cal-home-btn" onclick="showCalModal()">📅 学習予定をGoogleカレンダーに追加</button>`;
@@ -681,6 +712,10 @@ function startQuiz(mode){
   else if(mode==='stars3'){
     pool=shuffle([...catQ].filter(q=>q.stars>=3)).slice(0,20);
     if(!pool.length){alert('このカテゴリに頻出★★★問題がありません。');return;}
+  }
+  else if(mode==='today_wrong'){
+    pool=shuffle(todayWrong.ids.map(id=>QUESTIONS.find(x=>x.id===id)).filter(Boolean));
+    if(!pool.length){alert('今日間違えた問題はまだありません！\n素晴らしいです！');return;}
   }
   else if(mode==='mock'){
     // 本番模擬試験: 必修50問 + 一般60問 + 状況設定15問 = 125問
@@ -739,10 +774,11 @@ function answer(key){
   const correct=key===q.answer;
   if(!history[q.id]) history[q.id]={correct:0,wrong:0};
   if(correct) history[q.id].correct++;
-  else history[q.id].wrong++;
+  else {history[q.id].wrong++;if(!todayWrong.ids.includes(q.id))todayWrong.ids.push(q.id);saveTodayWrong();}
   save();
   updateScoreBadge();
   updateDailyStats();
+  renderGoalBar();
   if(session.mode==='mock'&&correct){
     if(q.category==='必修') session.hisshuCorrect=(session.hisshuCorrect||0)+1;
     else if(q.category==='一般') session.ippanCorrect=(session.ippanCorrect||0)+1;
@@ -969,6 +1005,8 @@ function backHome(){
   });
   renderHomeSummary();
   renderExamCountdown();
+  renderGoalBar();
+  initModeButtons();
 }
 
 // WEAK LIST
@@ -1914,6 +1952,7 @@ updateScoreBadge();
 initDailyMessage();
 renderHomeSummary();
 renderExamCountdown();
+renderGoalBar();
 </script>
 </body>
 </html>
