@@ -222,6 +222,30 @@ body{min-height:100vh;background:linear-gradient(135deg,#F5EFE8 0%,#EDE0D0 50%,#
 .timer-fill{height:100%;border-radius:10px;transition:.3s linear;background:linear-gradient(90deg,#4ade80,#D9C5B2)}
 .timer-fill.warn{background:linear-gradient(90deg,#f87171,#ef4444)}
 .timer-count{font-size:11px;font-weight:700;text-align:right;padding:2px 16px 0;color:#5A5450}
+/* 暗記カード */
+.flash-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px 8px;border-bottom:1px solid rgba(217,197,178,.2)}
+.flash-category-tabs{display:flex;gap:6px;flex-wrap:wrap;padding:10px 16px 0}
+.flash-cat-btn{padding:5px 12px;border-radius:20px;border:1.5px solid rgba(217,197,178,.4);background:rgba(240,232,222,.7);font-size:11px;font-weight:700;color:#6B5040;cursor:pointer;font-family:'Noto Sans JP',sans-serif;transition:.2s}
+.flash-cat-btn.active{background:linear-gradient(135deg,#D9C5B2,#B8A090);border-color:#B8A090;color:white}
+.flash-card-wrap{perspective:1000px;padding:16px;min-height:220px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.flash-card-inner{width:100%;max-width:480px;min-height:180px;position:relative;transition:transform .5s cubic-bezier(.4,2,.6,1);transform-style:preserve-3d}
+.flash-card-inner.flipped{transform:rotateY(180deg)}
+.flash-face{position:absolute;width:100%;min-height:180px;top:0;left:0;backface-visibility:hidden;border-radius:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;box-sizing:border-box;box-shadow:0 4px 24px rgba(184,160,144,.2)}
+.flash-front{background:linear-gradient(135deg,rgba(245,239,232,.95),rgba(237,224,212,.9));border:2px solid rgba(217,197,178,.5)}
+.flash-back{background:linear-gradient(135deg,rgba(90,80,70,.92),rgba(60,50,42,.9));color:#F5EFE8;transform:rotateY(180deg)}
+.flash-q-label{font-size:10px;font-weight:700;color:#B8A090;letter-spacing:1.5px;margin-bottom:10px;text-transform:uppercase}
+.flash-q-text{font-size:15px;font-weight:700;color:#3C2A1E;text-align:center;line-height:1.65}
+.flash-a-text{font-size:16px;font-weight:800;color:#F5EFE8;text-align:center;line-height:1.65}
+.flash-a-sub{font-size:11px;color:rgba(245,239,232,.7);margin-top:8px;text-align:center;line-height:1.6}
+.flash-hint{font-size:10px;color:rgba(107,80,64,.5);margin-top:12px;letter-spacing:.5px}
+.flash-nav{display:flex;align-items:center;justify-content:center;gap:12px;padding:8px 16px 16px}
+.flash-nav-btn{padding:8px 22px;border-radius:20px;border:1.5px solid rgba(217,197,178,.5);background:rgba(240,232,222,.8);font-size:13px;font-weight:700;color:#5A5450;cursor:pointer;font-family:'Noto Sans JP',sans-serif;transition:.2s}
+.flash-nav-btn:hover{background:rgba(217,197,178,.6)}
+.flash-counter{font-size:12px;color:#8A7060;font-weight:600;min-width:60px;text-align:center}
+body.dark .flash-front{background:rgba(40,32,28,.95);border-color:rgba(180,160,140,.2)}
+body.dark .flash-q-text{color:#D8C8B8}
+body.dark .flash-cat-btn{background:rgba(50,38,30,.8);border-color:rgba(180,160,140,.2);color:#C8B8A8}
+body.dark .flash-nav-btn{background:rgba(50,38,30,.8);border-color:rgba(180,160,140,.2);color:#C8B8A8}
 /* アチーブメント解除トースト */
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#D9C5B2,#B8A090);color:white;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:700;font-family:'Noto Sans JP',sans-serif;z-index:999;animation:toastIn .4s ease;box-shadow:0 4px 16px rgba(184,160,144,0.4);white-space:nowrap}
 @keyframes toastIn{from{opacity:0;transform:translateX(-50%) translateY(20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
@@ -386,6 +410,7 @@ body.font-xl .explanation{font-size:15px}
 
   <div id="quizArea" style="display:none;margin-top:0"></div>
   <div id="jokyoArea" style="display:none;margin-top:0"></div>
+  <div id="flashArea" style="display:none;margin-top:0"></div>
 </div>
 
 <!-- APIキー入力モーダル -->
@@ -720,6 +745,170 @@ function initChips(){
   }
 }
 
+// ========== 暗記カード ==========
+const FLASH_CARDS = [
+  // 検査値・基準値
+  {cat:'検査値',q:'成人の正常血圧（収縮期/拡張期）',a:'120/80 mmHg未満',sub:'130以上で高血圧（JSH2019）'},
+  {cat:'検査値',q:'成人の正常心拍数',a:'60〜100回/分',sub:'<60=徐脈　>100=頻脈'},
+  {cat:'検査値',q:'成人の正常呼吸数',a:'12〜20回/分',sub:'<12=徐呼吸　>20=頻呼吸'},
+  {cat:'検査値',q:'腋窩温の正常範囲',a:'36.0〜37.0℃',sub:'37.0〜37.9℃=微熱　≥38.0℃=発熱'},
+  {cat:'検査値',q:'成人の1回換気量（安静時）',a:'約500mL',sub:'分時換気量=500×15≒7.5L'},
+  {cat:'検査値',q:'SpO₂（経皮的酸素飽和度）正常値',a:'96〜100%',sub:'<90%は呼吸不全の目安'},
+  {cat:'検査値',q:'血糖（空腹時）正常値',a:'70〜109 mg/dL',sub:'≥126=糖尿病型　110〜125=境界型'},
+  {cat:'検査値',q:'HbA1c 正常値（NGSP）',a:'4.6〜6.2%',sub:'≥6.5%=糖尿病型の診断基準'},
+  {cat:'検査値',q:'血清Na正常値',a:'136〜147 mEq/L',sub:'<136=低Na　>147=高Na'},
+  {cat:'検査値',q:'血清K正常値',a:'3.5〜5.0 mEq/L',sub:'<3.5=低K（筋力低下）　>5.0=高K（不整脈）'},
+  {cat:'検査値',q:'血清クレアチニン正常値（男性）',a:'0.65〜1.09 mg/dL',sub:'腎機能障害で上昇（筋肉量依存）'},
+  {cat:'検査値',q:'eGFR 正常値',a:'≥60 mL/分/1.73m²',sub:'<60が3か月以上続くとCKD'},
+  {cat:'検査値',q:'成人の総コレステロール正常値',a:'<200 mg/dL（望ましい）',sub:'LDL<120、HDL≥40 mg/dL'},
+  {cat:'検査値',q:'赤血球数（RBC）正常値（男性）',a:'430〜570万/μL',sub:'女性: 380〜500万/μL'},
+  {cat:'検査値',q:'ヘモグロビン（Hb）正常値（男性）',a:'13.5〜17.6 g/dL',sub:'女性: 11.3〜15.2 g/dL　<11=貧血の目安'},
+  {cat:'検査値',q:'血小板数（PLT）正常値',a:'15〜40万/μL',sub:'<10万=血小板減少症'},
+  {cat:'検査値',q:'白血球数（WBC）正常値',a:'3,500〜9,800/μL',sub:'>10,000=白血球増多（感染など）'},
+  {cat:'検査値',q:'PT-INR（プロトロンビン時間）正常値',a:'0.9〜1.1',sub:'抗凝固療法中は2〜3が目標'},
+  {cat:'検査値',q:'尿素窒素（BUN）正常値',a:'8〜20 mg/dL',sub:'>25=腎機能障害または脱水の可能性'},
+  {cat:'検査値',q:'血清アルブミン正常値',a:'4.0〜5.0 g/dL',sub:'<3.5=低アルブミン血症（低栄養）'},
+  // 薬物・副作用
+  {cat:'薬物副作用',q:'ジギタリス（ジゴキシン）の中毒症状',a:'悪心・嘔吐・視覚異常（黄視）・徐脈・不整脈',sub:'血中濃度モニタリングが必須'},
+  {cat:'薬物副作用',q:'ACE阻害薬の特徴的副作用',a:'空咳（乾性咳嗽）',sub:'ARBへの変更で解決。高K血症にも注意'},
+  {cat:'薬物副作用',q:'ステロイド長期使用の主な副作用',a:'易感染・血糖上昇・骨粗鬆症・満月様顔貌（ムーンフェイス）',sub:'突然の中断は禁忌（副腎不全）'},
+  {cat:'薬物副作用',q:'アミノグリコシド系抗菌薬の主な副作用',a:'腎毒性・聴器毒性（難聴・耳鳴り）',sub:'トラフ値モニタリングが必要'},
+  {cat:'薬物副作用',q:'ワルファリン服用中に避けるべき食品',a:'納豆・クロレラ・青汁（ビタミンK含有）',sub:'グレープフルーツは他の薬に影響大'},
+  {cat:'薬物副作用',q:'インスリン投与で最も注意すべき副作用',a:'低血糖（冷汗・動悸・振戦・意識障害）',sub:'経口摂取できない場合はブドウ糖静注'},
+  {cat:'薬物副作用',q:'モルヒネの副作用3つ',a:'悪心・便秘・呼吸抑制',sub:'依存性より副作用管理が優先（WHO方式）'},
+  {cat:'薬物副作用',q:'NSAIDs（非ステロイド性抗炎症薬）の主な消化器副作用',a:'胃潰瘍・消化管出血',sub:'プロトンポンプ阻害薬（PPI）と併用で予防'},
+  {cat:'薬物副作用',q:'抗精神病薬（定型）の錐体外路症状',a:'パーキンソン症状・アカシジア・急性ジストニア・遅発性ジスキネジア',sub:'抗コリン薬（ビペリデン等）で対処'},
+  {cat:'薬物副作用',q:'リチウム（炭酸リチウム）の治療域血中濃度',a:'0.6〜1.2 mEq/L',sub:'>1.5=中毒域（振戦・嘔吐・腎障害）'},
+  // 看護技術・処置
+  {cat:'看護技術',q:'成人の導尿カテーテル挿入長（女性）',a:'4〜6cm',sub:'男性: 18〜20cm（前立腺を超える）'},
+  {cat:'看護技術',q:'浣腸液（グリセリン浣腸）の適切な温度',a:'40〜41℃',sub:'38℃以下は直腸収縮を起こす'},
+  {cat:'看護技術',q:'褥瘡リスク評価スケール（日本国内で最多使用）',a:'ブレーデンスケール',sub:'6項目を採点。23点満点で低いほどリスク高'},
+  {cat:'看護技術',q:'輸血前に確認すべき「6R」',a:'正しい患者・血液型・製剤・量・投与経路・投与時間',sub:'患者照合は2名で実施'},
+  {cat:'看護技術',q:'輸血の副作用で最も多い（頻度）',a:'発熱・悪寒（非溶血性発熱反応）',sub:'アレルギー反応、溶血性副作用にも注意'},
+  {cat:'看護技術',q:'経鼻胃管（NGチューブ）挿入確認方法（最確実）',a:'胸部X線による位置確認',sub:'気泡音確認は不正確。pHテスト（<5.5）も補助的に使用'},
+  {cat:'看護技術',q:'採血の一般的な静脈穿刺角度',a:'15〜30°',sub:'針斜面を上向きにして穿刺'},
+  {cat:'看護技術',q:'酸素ボンベ（500L）で2L/分投与時の使用可能時間',a:'約250分（約4時間）',sub:'500÷2=250分。ボンベは0.2MPa以上残すこと'},
+  {cat:'看護技術',q:'MMT（徒手筋力テスト）の段階0〜5の意味',a:'0=収縮なし　1=収縮あり動きなし　2=重力除く動き　3=重力に打ち勝つ　4=抵抗に部分打ち勝つ　5=正常筋力',sub:'3以上が日常生活の目安'},
+  {cat:'看護技術',q:'グラスゴーコーマスケール（GCS）の最高点と最低点',a:'最高15点（正常）・最低3点',sub:'E4+V5+M6=15。8点以下で重症意識障害'},
+  {cat:'看護技術',q:'意識レベル評価 JCS（Japan Coma Scale）3-3-9度',a:'I:刺激なく覚醒(1.2.3)　II:刺激で覚醒(10.20.30)　III:刺激でも覚醒せず(100.200.300)',sub:'300=全く反応なし'},
+  // 感染・予防
+  {cat:'感染管理',q:'標準予防策（スタンダードプリコーション）で手洗いが必要な5つのタイミング',a:'①患者接触前②清潔・無菌操作前③体液曝露後④患者接触後⑤患者周囲環境接触後',sub:'WHO提唱 "5 Moments for Hand Hygiene"'},
+  {cat:'感染管理',q:'空気感染する主な感染症3つ',a:'結核・麻疹・水痘（帯状疱疹）',sub:'陰圧個室・N95マスク・ドア閉鎖が必要'},
+  {cat:'感染管理',q:'飛沫感染する主な感染症',a:'インフルエンザ・百日咳・流行性耳下腺炎・風疹・RSウイルス',sub:'サージカルマスクで防御可能（2m以内）'},
+  {cat:'感染管理',q:'接触感染の防護具（PPE）',a:'手袋・ガウン（エプロン）',sub:'MRSA・VRE・疥癬・クロストリジウム（CDI）など'},
+  {cat:'感染管理',q:'滅菌と消毒の違い',a:'滅菌=芽胞を含むすべての微生物を死滅・消毒=病原微生物を減らす（芽胞は除去できない）',sub:'スポルディング分類：クリティカル（滅菌）セミクリティカル（高水準消毒）非クリティカル（低水準消毒）'},
+  {cat:'感染管理',q:'針刺し事故後の対応（第一優先）',a:'流水で傷口を洗い流す（絞り出しながら）',sub:'上司・師長に報告→感染管理部門へ連絡→血液検査・予防内服の手配'},
+  // 疾患・病態
+  {cat:'疾患・病態',q:'脳梗塞の3大原因',a:'アテローム血栓性・心原性塞栓性・ラクナ梗塞',sub:'t-PA投与は発症4.5時間以内かつ適応確認が必要'},
+  {cat:'疾患・病態',q:'急性心筋梗塞の典型症状',a:'30分以上持続する胸骨後部の締め付け感・冷汗・放散痛（左肩・左腕・顎）',sub:'NTG（ニトログリセリン）無効が特徴。すぐに12誘導心電図'},
+  {cat:'疾患・病態',q:'心不全の代償機序（3つ）',a:'頻脈化・心室拡大（前負荷増大）・心筋肥大',sub:'長期的には有害。これらが破綻すると非代償性心不全'},
+  {cat:'疾患・病態',q:'糖尿病性ケトアシドーシス（DKA）の3主徴',a:'高血糖・ケトン体上昇・代謝性アシドーシス',sub:'1型DM多い。口臭（アセトン臭）・クスマウル呼吸・意識障害'},
+  {cat:'疾患・病態',q:'慢性閉塞性肺疾患（COPD）の主な原因と換気障害の型',a:'喫煙（主因）・閉塞性換気障害（FEV₁/FVC<70%）',sub:'GOLDガイドライン。肺胞破壊（気腫型）と気道炎症（慢性気管支炎型）'},
+  {cat:'疾患・病態',q:'腎不全（CKD Stage5）の主な症状',a:'浮腫・高血圧・高K血症・代謝性アシドーシス・貧血（EPO低下）・骨粗鬆症',sub:'eGFR<15=透析導入を検討'},
+  {cat:'疾患・病態',q:'肝硬変の門脈圧亢進症状',a:'食道静脈瘤・腹水・脾腫・メデューサの頭（腹壁静脈怒張）',sub:'食道静脈瘤破裂は致死的出血。内視鏡的治療が第一選択'},
+  {cat:'疾患・病態',q:'甲状腺機能亢進症（バセドウ病）の3主徴',a:'びまん性甲状腺腫・眼球突出・頻脈',sub:'TSH低下・FT3/FT4上昇。抗TSH受容体抗体陽性'},
+  {cat:'疾患・病態',q:'クッシング症候群の特徴的な身体所見',a:'中心性肥満・満月様顔貌・水牛様脂肪沈着・紫色皮膚線条',sub:'コルチゾール過剰産生。血糖↑・骨粗鬆症・易感染'},
+  {cat:'疾患・病態',q:'アナフィラキシーショックの第一選択薬と投与経路',a:'アドレナリン（エピネフリン）0.3mg 筋肉注射（大腿外側）',sub:'エピペン®。抗ヒスタミン薬やステロイドは補助的'},
+];
+
+let flashState = {cat:'すべて', idx:0, flipped:false};
+const FLASH_CATS = ['すべて','検査値','薬物副作用','看護技術','感染管理','疾患・病態'];
+
+function showFlashCards(){
+  document.getElementById('tabHome').style.display='none';
+  document.getElementById('quizArea').style.display='none';
+  document.getElementById('jokyoArea').style.display='none';
+  const fa=document.getElementById('flashArea');
+  fa.style.display='block';
+  flashState.idx=0;
+  flashState.flipped=false;
+  renderFlash();
+}
+
+function getFlashPool(){
+  return flashState.cat==='すべて'?FLASH_CARDS:FLASH_CARDS.filter(c=>c.cat===flashState.cat);
+}
+
+function renderFlash(){
+  const fa=document.getElementById('flashArea');
+  const pool=getFlashPool();
+  if(!pool.length){fa.innerHTML='<div class="card"><p style="text-align:center;padding:40px;color:#8A7060">カードがありません</p></div>';return;}
+  const idx=flashState.idx;
+  const card=pool[idx];
+  const catBtns=FLASH_CATS.map(c=>`<button class="flash-cat-btn${flashState.cat===c?' active':''}" onclick="flashSetCat('${c}')">${c}</button>`).join('');
+  fa.innerHTML=`<div class="card" style="padding:0;overflow:hidden;animation:fadein .3s ease">
+    <div class="flash-header">
+      <button class="back-btn" onclick="endFlash()">← 戻る</button>
+      <div style="font-size:13px;font-weight:700;color:#6B5040">暗記カード</div>
+      <div style="font-size:11px;color:#8A7060">${idx+1} / ${pool.length}</div>
+    </div>
+    <div class="flash-category-tabs">${catBtns}</div>
+    <div class="flash-card-wrap" onclick="flashFlip()" title="タップで答えを見る">
+      <div class="flash-card-inner${flashState.flipped?' flipped':''}" id="flashInner">
+        <div class="flash-face flash-front">
+          <div class="flash-q-label">${card.cat}</div>
+          <div class="flash-q-text">${card.q}</div>
+          <div class="flash-hint">タップして答えを確認 →</div>
+        </div>
+        <div class="flash-face flash-back">
+          <div class="flash-q-label" style="color:rgba(245,239,232,.5)">${card.cat}</div>
+          <div class="flash-a-text">${card.a}</div>
+          ${card.sub?`<div class="flash-a-sub">${card.sub}</div>`:''}
+        </div>
+      </div>
+    </div>
+    <div class="flash-nav">
+      <button class="flash-nav-btn" onclick="flashPrev()">← 前へ</button>
+      <div class="flash-counter">${idx+1} / ${pool.length}</div>
+      <button class="flash-nav-btn" onclick="flashNext()">次へ →</button>
+    </div>
+    <div style="display:flex;gap:8px;padding:0 16px 16px">
+      <button class="flash-nav-btn" style="flex:1;background:rgba(74,222,128,.1);border-color:rgba(74,222,128,.4);color:#166534" onclick="flashNext()">覚えた ✓</button>
+      <button class="flash-nav-btn" style="flex:1;background:rgba(248,113,113,.1);border-color:rgba(248,113,113,.4);color:#991b1b" onclick="flashNext()">もう一度</button>
+    </div>
+  </div>`;
+}
+
+function flashFlip(){
+  flashState.flipped=!flashState.flipped;
+  const inner=document.getElementById('flashInner');
+  if(inner) inner.classList.toggle('flipped',flashState.flipped);
+}
+
+function flashSetCat(cat){
+  flashState.cat=cat;
+  flashState.idx=0;
+  flashState.flipped=false;
+  renderFlash();
+}
+
+function flashNext(){
+  const pool=getFlashPool();
+  flashState.idx=(flashState.idx+1)%pool.length;
+  flashState.flipped=false;
+  renderFlash();
+}
+
+function flashPrev(){
+  const pool=getFlashPool();
+  flashState.idx=(flashState.idx-1+pool.length)%pool.length;
+  flashState.flipped=false;
+  renderFlash();
+}
+
+function endFlash(){
+  document.getElementById('flashArea').style.display='none';
+  document.getElementById('tabHome').style.display='block';
+  document.querySelectorAll('.tab').forEach((b,i)=>b.classList.toggle('active',i===0));
+  document.querySelectorAll('.sub-tab').forEach(b=>{
+    b.classList.toggle('active',b.dataset.cat===currentCategory);
+  });
+  renderHomeSummary();
+  renderExamCountdown();
+  renderGoalBar();
+  initModeButtons();
+}
+
 // MODE BUTTONS
 function initModeButtons(){
   const mg=document.getElementById('modeGrid');
@@ -739,6 +928,7 @@ function initModeButtons(){
       ${todayWrongBtn}
       <button class="mode-btn" onclick="startQuiz('allcat')"><div class="mode-icon">🏃</div><div class="mode-title">100問一気</div><div class="mode-desc">本番形式</div></button>
       <button class="mode-btn" onclick="startQuiz('hisshu')" style="border-color:rgba(217,197,178,0.5);background:rgba(237,224,212,0.9);grid-column:1/-1"><div class="mode-icon">⭐</div><div class="mode-title">必修50問 本番形式</div><div class="mode-desc">合格ライン80%（40/50問）で合否判定</div></button>
+      <button class="mode-btn" onclick="showFlashCards()" style="border-color:rgba(184,160,144,0.5);background:linear-gradient(135deg,rgba(245,239,232,0.95),rgba(237,224,212,0.9));grid-column:1/-1"><div class="mode-icon">🃏</div><div class="mode-title">暗記カード</div><div class="mode-desc">検査値・薬物・看護技術など60枚</div></button>
       <button class="cal-home-btn" onclick="showCalModal()">📅 学習予定をGoogleカレンダーに追加</button>`;
   }
   else if(currentCategory==='一般'){
@@ -752,6 +942,7 @@ function initModeButtons(){
       ${todayWrongBtn}
       <button class="mode-btn" onclick="startQuiz('allcat')"><div class="mode-icon">🏃</div><div class="mode-title">100問一気</div><div class="mode-desc">本番形式</div></button>
       <button class="mode-btn" onclick="startQuiz('ippan50')" style="border-color:rgba(217,197,178,0.5);background:rgba(237,224,212,0.9);grid-column:1/-1"><div class="mode-icon">📚</div><div class="mode-title">一般問題 50問演習</div><div class="mode-desc">11分野からバランスよく出題</div></button>
+      <button class="mode-btn" onclick="showFlashCards()" style="border-color:rgba(184,160,144,0.5);background:linear-gradient(135deg,rgba(245,239,232,0.95),rgba(237,224,212,0.9));grid-column:1/-1"><div class="mode-icon">🃏</div><div class="mode-title">暗記カード</div><div class="mode-desc">検査値・薬物・看護技術など60枚</div></button>
       <button class="cal-home-btn" onclick="showCalModal()">📅 学習予定をGoogleカレンダーに追加</button>`;
   }
   else if(currentCategory==='状況設定'){
@@ -765,6 +956,7 @@ function initModeButtons(){
       ${todayWrongBtn}
       <button class="mode-btn" onclick="startQuiz('allcat')"><div class="mode-icon">🏃</div><div class="mode-title">全問一気</div><div class="mode-desc">本番形式</div></button>
       <button class="mode-btn" onclick="startJokyoMode()" style="border-color:rgba(5,150,105,0.5);background:rgba(230,255,245,0.9);grid-column:1/-1"><div class="mode-icon">📋</div><div class="mode-title">状況設定 専用モード</div><div class="mode-desc">事例を1問ずつ、丁寧に解く</div></button>
+      <button class="mode-btn" onclick="showFlashCards()" style="border-color:rgba(184,160,144,0.5);background:linear-gradient(135deg,rgba(245,239,232,0.95),rgba(237,224,212,0.9));grid-column:1/-1"><div class="mode-icon">🃏</div><div class="mode-title">暗記カード</div><div class="mode-desc">検査値・薬物・看護技術など60枚</div></button>
       <button class="cal-home-btn" onclick="showCalModal()">📅 学習予定をGoogleカレンダーに追加</button>`;
   }
 }
@@ -1140,6 +1332,7 @@ function retrySession(){
 function backHome(){
   document.getElementById('quizArea').style.display='none';
   document.getElementById('jokyoArea').style.display='none';
+  document.getElementById('flashArea').style.display='none';
   document.getElementById('tabHome').style.display='block';
   document.querySelectorAll('.tab').forEach((b,i)=>b.classList.toggle('active',i===0));
   document.querySelectorAll('.sub-tab').forEach(b=>{
