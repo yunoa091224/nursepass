@@ -480,6 +480,19 @@ let srsData=JSON.parse(localStorage.getItem('np_srs')||'{}');
 // デイリーチャレンジ: {date:'YYYY-MM-DD', correct:0, total:0, done:false}
 let dailyChallenge=JSON.parse(localStorage.getItem('np_daily')||'null');
 function seededRand(seed){let x=Math.sin(seed+1)*10000;return x-Math.floor(x);}
+function shareResult(rate, total, correct){
+  const stars=rate>=90?'★★★':rate>=70?'★★':'★';
+  const streak=streakData.streak||0;
+  const mode={'random':'ランダム','field':'分野別','weak':'苦手強化','hisshu':'必修50問','ippan50':'一般50問','timeatk':'タイムアタック','mock':'模擬試験','daily':'デイリーチャレンジ','srs':'SRS復習','allcat':'100問一気'}[session.mode]||'演習';
+  const text=`📚 NursePass 学習記録\n${new Date().toLocaleDateString('ja-JP')}\n\n${mode}：${correct}/${total}問正解\n正答率：${rate}% ${stars}\n🔥 連続学習：${streak}日\n\n#NursePass #看護師国家試験 #看護学生`;
+  if(navigator.share){
+    navigator.share({title:'NursePass 学習記録',text}).catch(()=>{});
+  } else {
+    navigator.clipboard.writeText(text).then(()=>showToast('クリップボードにコピーしました！')).catch(()=>{
+      const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);showToast('コピーしました！');
+    });
+  }
+}
 function pickCount(mode, label){
   const existing=document.getElementById('countModal');
   if(existing) existing.remove();
@@ -1411,6 +1424,7 @@ function finishQuiz(){
       <div class="result-msg">${msg}</div>
       <button class="result-retry" onclick="retrySession()">もう一度やる</button>
       <button class="result-home" onclick="backHome()">ホームへ戻る</button>
+      <button onclick="shareResult(${rate},${total},${session.correct})" style="width:100%;padding:12px;background:rgba(59,130,246,0.1);color:#1d4ed8;border:1.5px solid rgba(59,130,246,0.3);border-radius:14px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;margin-bottom:8px">📤 結果をシェア</button>
       <button class="cal-btn" onclick="showCalModal('NursePass 看護師国試 学習', '正解率 ${rate}% (${total}問中${session.correct}問正解)')">📅 次の学習をカレンダーに追加</button>
     </div>
   </div>`;
@@ -1642,8 +1656,10 @@ function renderStats(){
     const qs=QUESTIONS.filter(q=>q.field===f);
     const c=qs.reduce((s,q)=>{const h=history[String(q.id)];return s+(h?h.correct:0);},0);
     const w=qs.reduce((s,q)=>{const h=history[String(q.id)];return s+(h?h.wrong:0);},0);
-    return{f,t:c+w,rate:c+w?Math.round(c/(c+w)*100):null};
+    return{f,t:c+w,rate:c+w?Math.round(c/(c+w)*100):null,label:f.replace('必修・','').replace('一般・','').replace('状況設定・','')};
   }).filter(x=>x.t>0).sort((a,b)=>a.rate-b.rate);
+  const worstFields=fieldStats.slice(0,3);
+  const bestFields=[...fieldStats].sort((a,b)=>b.rate-a.rate).slice(0,3);
 
   // 週間グラフ
   const weekDays=[];
@@ -1699,6 +1715,19 @@ function renderStats(){
     <div class="result-label2">解答${answered}問 / 学習済み${total}問（カバー率${coverPct2}%）</div>
     <div style="display:flex;gap:8px;margin-top:12px">${catHtml}</div>
     ${weekChart}
+    ${fieldStats.length>=2?`<div style="text-align:left;margin-top:12px">
+      <div class="cat-stat-header">▸ 分野ランキング</div>
+      <div style="display:flex;gap:8px;margin-top:6px">
+        <div style="flex:1;padding:10px;background:rgba(74,222,128,0.08);border:1.5px solid rgba(74,222,128,0.25);border-radius:12px">
+          <div style="font-size:10px;font-weight:700;color:#16a34a;margin-bottom:6px">🏆 得意トップ3</div>
+          ${bestFields.map((x,i)=>`<div style="font-size:11px;color:#4A3828;margin-bottom:3px"><span style="color:#8A6A50;font-weight:700">${['①','②','③'][i]}</span> ${x.label}<span style="float:right;font-weight:700;color:#16a34a">${x.rate}%</span></div>`).join('')}
+        </div>
+        <div style="flex:1;padding:10px;background:rgba(248,113,113,0.06);border:1.5px solid rgba(248,113,113,0.2);border-radius:12px">
+          <div style="font-size:10px;font-weight:700;color:#dc2626;margin-bottom:6px">💪 苦手ワースト3</div>
+          ${worstFields.map((x,i)=>`<div style="font-size:11px;color:#4A3828;margin-bottom:3px"><span style="color:#8A6A50;font-weight:700">${['①','②','③'][i]}</span> ${x.label}<span style="float:right;font-weight:700;color:#dc2626">${x.rate}%</span></div>`).join('')}
+        </div>
+      </div>
+    </div>`:''}
     ${fieldStats.length?`<div class="per-cat-stats" style="text-align:left">
       <div class="cat-stat-header">▸ 分野別 正答率 &amp; カバー率（苦手順）</div>
       ${fieldStats.map(x=>fieldBar(x.f)).join('')}
