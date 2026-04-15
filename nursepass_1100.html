@@ -1017,7 +1017,12 @@ function renderHomeSummary(){
     else{
       pe.textContent=ps+'%';
       const sub=pe.parentElement.querySelector('.pass-lbl-sub');
-      if(sub) sub.textContent=ps>=80?'合格圏内！':ps>=65?'もう少し！':'要強化';
+      if(sub){
+        const days=getExamDays();
+        const remaining=QUESTIONS.length-attempted;
+        const paceText=days&&days>0&&remaining>0?`残り${remaining}問 / 試験まで${days}日 = 1日${Math.ceil(remaining/days)}問`:(ps>=80?'合格圏内！':ps>=65?'もう少し！':'要強化');
+        sub.textContent=paceText;
+      }
       pe.style.color=ps>=80?'#16a34a':ps>=65?'#D9A060':'#ef4444';
     }
   }
@@ -1551,7 +1556,7 @@ function renderQuestion(){
         <div class="q-count">${isTime?'⏱ ':''}${session.idx+1}/${total}</div>
       </div>
       ${isTime?`<div class="timer-bar"><div class="timer-fill" id="timerFill" style="width:100%"></div></div><div class="timer-count" id="timerCnt">${session.timeLimit}秒</div>`:''}
-      <div class="q-field" style="display:flex;justify-content:space-between;align-items:center">${q.category} ▸ ${q.field}<span style="display:flex;align-items:center;gap:8px"><span style="color:#C0B0A0;font-size:9px;letter-spacing:0">A/B/C/D キー</span><span style="color:#D9C5B2;font-size:12px;letter-spacing:1px">${'★'.repeat(q.stars||1)+'☆'.repeat(3-(q.stars||1))}</span></span></div>
+      <div class="q-field" style="display:flex;justify-content:space-between;align-items:center"><span>${q.category} ▸ ${q.field} <span style="color:#C0B0A0;font-size:9px">#${q.id}</span></span><span style="display:flex;align-items:center;gap:8px"><span style="color:#C0B0A0;font-size:9px;letter-spacing:0">A/B/C/D キー</span><span style="color:#D9C5B2;font-size:12px;letter-spacing:1px">${'★'.repeat(q.stars||1)+'☆'.repeat(3-(q.stars||1))}</span></span></div>
       <div class="q-text">${q.question}</div>
       <div class="choices">
         ${Object.entries(q.choices).map(([k,v])=>`
