@@ -396,6 +396,8 @@ body.font-xl .explanation{font-size:15px}
         <button class="chip" id="weakFilterbookmark" onclick="setWeakFilter('bookmark')" style="margin-left:4px">🔖 ブックマーク</button>
         <button class="chip" id="weakFiltermemo" onclick="setWeakFilter('memo')">📝 メモ</button>
         <button class="chip" id="weakFilterbrowse" onclick="setWeakFilter('browse')" style="margin-left:4px">📋 全問</button>
+        <button class="chip" id="weakFilterunanswered" onclick="setWeakFilter('unanswered')" style="margin-left:4px">✨ 未解答</button>
+        <button class="chip" id="weakFilterwrong_only" onclick="setWeakFilter('wrong_only')">✗ 間違えた</button>
         <button class="chip" id="weakFilterimportant" onclick="setWeakFilter('tag_important')" style="margin-left:4px">⭐重要</button>
         <button class="chip" id="weakFilterhard" onclick="setWeakFilter('tag_hard')">🔴難解</button>
         <button class="chip" id="weakFilterreview" onclick="setWeakFilter('tag_review')">🔵復習</button>
@@ -2896,6 +2898,7 @@ function finishQuiz(){
       <button class="result-home" onclick="stopTts();backHome()">ホームへ戻る</button>
       <button onclick="shareResult(${rate},${total},${session.correct})" style="width:100%;padding:12px;background:rgba(59,130,246,0.1);color:#1d4ed8;border:1.5px solid rgba(59,130,246,0.3);border-radius:14px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;margin-bottom:8px">📤 結果をシェア</button>
       <button class="cal-btn" onclick="showCalModal('NursePass 看護師国試 学習', '正解率 ${rate}% (${total}問中${session.correct}問正解)')">📅 次の学習をカレンダーに追加</button>
+      ${(()=>{const msgs=[rate>=90?'完璧な結果だね。このまま本番でも力を発揮できるよ🌸':'今日も一歩前へ進んだよ。続けることが一番大切だよ✨',rate>=70?'着実に力がついてきてるよ。あと少しで合格圏内だね🌟':'間違えた問題が、明日のあなたを強くしてくれる。大丈夫✨',streakData.streak>=3?`${streakData.streak}日連続！その習慣が本物の実力になるよ🔥`:'毎日少しでもいい。続けていくことが合格への道だよ💫',Object.keys(bookmarks).length>0?'ブックマークした問題は宝物。後でじっくり復習してね🌸':'気になった問題はブックマークしておくと後で見返せるよ✨'];const msg=msgs[Math.floor(Math.random()*msgs.length)];return`<div style="margin-top:12px;padding:10px 12px;background:linear-gradient(135deg,rgba(245,239,232,0.9),rgba(237,224,212,0.85));border:1.5px solid rgba(217,197,178,0.4);border-radius:12px;font-size:11px;color:#4A3828;line-height:1.6;text-align:center"><span style="font-size:10px;font-weight:700;color:#B8907A;display:block;margin-bottom:4px">🌸 のあ先生より</span>${msg}</div>`;})()}
     </div>
   </div>`;
   recordStudyTime();
@@ -3064,7 +3067,7 @@ function setWeakSort(s){
 }
 function setWeakFilter(f){
   weakFilter=f;
-  ['all','必修','一般','状況設定','bookmark','memo','browse'].forEach(k=>{
+  ['all','必修','一般','状況設定','bookmark','memo','browse','unanswered','wrong_only'].forEach(k=>{
     const btn=document.getElementById('weakFilter'+(k==='all'?'All':k));
     if(btn) btn.classList.toggle('selected',k===f);
   });
@@ -3183,6 +3186,25 @@ function renderWeak(){
         <button onclick="event.stopPropagation();openMemo(${q.id})" style="margin-top:4px;padding:2px 8px;background:none;border:1px solid rgba(217,160,96,0.3);border-radius:6px;font-size:10px;color:#8A6A50;cursor:pointer;font-family:'Noto Sans JP',sans-serif">✏️ 編集</button>
       </div>`;
     }).join('');
+    return;
+  }
+  if(weakFilter==='unanswered'){
+    const pool=QUESTIONS.filter(q=>!history[String(q.id)]);
+    if(sb) sb.innerHTML=`未解答 <strong style="color:#B8907A">${pool.length}</strong>問`;
+    if(wb) wb.style.display=pool.length?'block':'none';
+    if(!pool.length){wl.innerHTML='<div class="empty">🎉 全問解答済みです！素晴らしい！</div>';return;}
+    wl.innerHTML=pool.slice(0,50).map(q=>`<div class="weak-item" onclick="drillOne(${q.id})">
+      <div class="weak-q">✨ ${q.question}</div>
+      <div class="weak-meta">${q.category} ▸ ${q.field.replace('必修・','').replace('一般・','').replace('状況設定・','')} ▸ ${'★'.repeat(q.stars||1)}</div>
+    </div>`).join('')+(pool.length>50?`<div style="text-align:center;padding:8px;font-size:11px;color:#8A6A50">他${pool.length-50}問</div>`:'');
+    return;
+  }
+  if(weakFilter==='wrong_only'){
+    const pool=Object.entries(history).filter(([id,h])=>h.wrong>0).map(([id])=>{const q=QUESTIONS.find(x=>x.id===Number(id));return q;}).filter(Boolean).sort((a,b)=>history[String(b.id)].wrong-history[String(a.id)].wrong);
+    if(sb) sb.innerHTML=`間違えた問題 <strong style="color:#B8907A">${pool.length}</strong>問`;
+    if(wb) wb.style.display=pool.length?'block':'none';
+    if(!pool.length){wl.innerHTML='<div class="empty">まだ間違えた問題はないよ！すごい！</div>';return;}
+    wl.innerHTML=pool.slice(0,50).map(q=>{const h=history[String(q.id)];const acc=Math.round(h.correct/(h.correct+h.wrong)*100);return `<div class="weak-item" onclick="drillOne(${q.id})"><div class="weak-q">✗ ${q.question}</div><div class="weak-meta">${q.field.replace('必修・','').replace('一般・','').replace('状況設定・','')} · <span style="color:#dc2626;font-weight:600">間違え${h.wrong}回 (${acc}%)</span></div></div>`;}).join('');
     return;
   }
   if(weakFilter==='browse'){
