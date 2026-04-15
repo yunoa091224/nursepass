@@ -386,7 +386,10 @@ body.font-xl .explanation{font-size:15px}
         <button class="sub-tab" data-cat="状況設定" onclick="selectCategory('状況設定')">状況設定<span class="cat-count" id="catCount状況設定"></span></button>
       </div>
       <div class="field-select">
-        <div class="field-label">▸ 分野を選ぶ（複数選択可・未選択で全分野）</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <div class="field-label" style="margin-bottom:0">▸ 分野を選ぶ（複数選択可・未選択で全分野）</div>
+          <button onclick="toggleSkipMastered()" class="skip-mastered-btn" style="padding:3px 9px;background:rgba(240,232,222,0.8);border:1px solid rgba(85,80,77,0.2);border-radius:10px;font-size:10px;color:#8A6A50;cursor:pointer;font-family:'Noto Sans JP',sans-serif;white-space:nowrap">⬜ 習得済みも出題</button>
+        </div>
         <div class="field-chips" id="fieldChips"></div>
       </div>
       <div class="mode-grid" id="modeGrid"></div>
@@ -631,6 +634,20 @@ function haptic(correct){
 (()=>{const btn=document.getElementById('hapticBtn');if(btn)btn.style.opacity=hapticEnabled?'1':'0.3';})();
 // 正解後自動送り設定
 let autoAdvance=localStorage.getItem('np_auto_advance')==='1';
+let skipMastered=localStorage.getItem('np_skip_mastered')==='1';
+function toggleSkipMastered(){
+  skipMastered=!skipMastered;
+  localStorage.setItem('np_skip_mastered',skipMastered?'1':'0');
+  showToast(skipMastered?'✅ 習得済み問題をスキップ':'🔄 習得済み問題も出題');
+  document.querySelectorAll('.skip-mastered-btn').forEach(b=>{
+    b.style.background=skipMastered?'rgba(74,222,128,0.2)':'rgba(240,232,222,0.8)';
+    b.style.color=skipMastered?'#166534':'#8A6A50';
+    b.style.borderColor=skipMastered?'rgba(74,222,128,0.4)':'rgba(85,80,77,0.2)';
+    b.textContent=skipMastered?'✅ 習得済みスキップ中':'⬜ 習得済みも出題';
+  });
+}
+function isMastered(id){const h=history[String(id)];return h&&h.correct>=3&&h.correct>=h.wrong*3;}
+
 let autoAdvanceTimer=null;
 function toggleAutoAdvance(){
   autoAdvance=!autoAdvance;
@@ -1303,9 +1320,22 @@ function renderExamCountdown(){
   const el=document.getElementById('examCountdown');
   if(!el) return;
   const days=getExamDays();
-  if(days===null){el.innerHTML=`<span style="color:#8A6A50;cursor:pointer" onclick="setExamDate()">🎯 試験日を設定する</span>`;return;}
-  const color=days<=30?'#991b1b':days<=60?'#B8907A':'#16a34a';
-  el.innerHTML=`<span style="color:${color};font-weight:700;cursor:pointer" onclick="setExamDate()" title="クリックして変更">🎯 試験まであと <strong>${days}</strong>日</span>`;
+  if(days===null){el.innerHTML=`<span style="color:#8A6A50;cursor:pointer;font-size:12px" onclick="setExamDate()">🎯 試験日を設定する</span>`;return;}
+  if(days<0){el.innerHTML=`<span style="color:#16a34a;font-weight:700;font-size:13px" onclick="setExamDate()" style="cursor:pointer">🎓 試験日が過ぎました。お疲れ様でした！</span>`;return;}
+  const months=Math.floor(days/30);
+  const weeks=Math.floor((days%30)/7);
+  const remDays=days%7;
+  const color=days<=14?'#991b1b':days<=30?'#c2410c':days<=60?'#B8907A':'#4A7A60';
+  const urgency=days<=7?'🚨':days<=30?'⚠️':days<=60?'🎯':'📅';
+  const units=[];
+  if(months>0) units.push({n:months,label:'ヶ月'});
+  if(weeks>0) units.push({n:weeks,label:'週'});
+  units.push({n:remDays,label:'日'});
+  el.innerHTML=`<div onclick="setExamDate()" title="クリックして変更" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:rgba(255,255,255,0.75);border:1.5px solid ${color}30;border-radius:12px">
+    <span style="font-size:14px">${urgency}</span>
+    <span style="font-size:10px;color:#8A6A50">試験まで</span>
+    ${units.map(u=>`<span style="display:inline-flex;flex-direction:column;align-items:center;line-height:1.1"><span style="font-size:18px;font-weight:800;color:${color};font-variant-numeric:tabular-nums">${u.n}</span><span style="font-size:9px;color:#8A6A50">${u.label}</span></span>`).join('<span style="color:#ccc;font-size:12px">·</span>')}
+  </div>`;
 }
 
 function save(){localStorage.setItem('np_history',JSON.stringify(history))}
@@ -2460,21 +2490,24 @@ function startQuiz(mode){
   let pool=[];
   const catQ=QUESTIONS.filter(q=>q.category===currentCategory);
   const fieldFilter=selectedFields.length?catQ.filter(q=>selectedFields.includes(q.field)):catQ;
+  const applySkip=arr=>skipMastered?arr.filter(q=>!isMastered(q.id)):arr;
   if(mode==='random'){
     // Smart weighted random: 40% weak/unmastered, 30% unread, 30% general
-    const weakQ=fieldFilter.filter(q=>{const h=history[String(q.id)];return h&&h.wrong>0&&h.correct<=h.wrong;});
-    const unreadQ=fieldFilter.filter(q=>!history[String(q.id)]);
-    const otherQ=fieldFilter.filter(q=>{const h=history[String(q.id)];return h&&(h.correct>h.wrong);});
+    const base=applySkip(fieldFilter);
+    const weakQ=base.filter(q=>{const h=history[String(q.id)];return h&&h.wrong>0&&h.correct<=h.wrong;});
+    const unreadQ=base.filter(q=>!history[String(q.id)]);
+    const otherQ=base.filter(q=>{const h=history[String(q.id)];return h&&(h.correct>h.wrong);});
     const pick=(arr,n)=>shuffle([...arr]).slice(0,n);
     const n=5;
     const weakN=weakQ.length?Math.min(Math.round(n*0.4),weakQ.length):0;
     const unreadN=unreadQ.length?Math.min(Math.round(n*0.3),unreadQ.length):0;
     const otherN=Math.min(n-weakN-unreadN,otherQ.length);
     const selected=new Set([...pick(weakQ,weakN),...pick(unreadQ,unreadN),...pick(otherQ,otherN)].map(q=>q.id));
-    if(selected.size<n){shuffle([...fieldFilter]).forEach(q=>{if(selected.size<n)selected.add(q.id);});}
+    if(selected.size<n){shuffle([...base]).forEach(q=>{if(selected.size<n)selected.add(q.id);});}
     pool=shuffle(QUESTIONS.filter(q=>selected.has(q.id)).slice(0,n));
+    if(!pool.length&&skipMastered){showToast('習得済み以外の問題がありません。スキップを解除します');skipMastered=false;pool=shuffle([...fieldFilter]).slice(0,5);}
   }
-  else if(mode==='field') pool=shuffle([...fieldFilter]).slice(0,10);
+  else if(mode==='field') pool=shuffle([...applySkip(fieldFilter)]).slice(0,10);
   else if(mode==='weak'){
     const weakIds=Object.keys(history).filter(id=>history[id].wrong>0);
     pool=shuffle(catQ.filter(q=>weakIds.includes(String(q.id))));
@@ -3776,6 +3809,49 @@ function renderFieldRanking(){
     </div>
   </div>`;
 }
+// 月別学習統計
+function renderMonthlyStats(){
+  // Aggregate weeklyData by month
+  const monthly={};
+  Object.entries(weeklyData).forEach(([dt,cnt])=>{
+    const m=dt.slice(0,7);
+    monthly[m]=(monthly[m]||0)+cnt;
+  });
+  const monthKeys=Object.keys(monthly).sort().slice(-6); // last 6 months
+  if(monthKeys.length<2) return '';
+  const accByMonth={};
+  Object.entries(dailyAccuracy).forEach(([dt,da])=>{
+    const m=dt.slice(0,7);
+    if(!accByMonth[m]) accByMonth[m]={c:0,t:0};
+    accByMonth[m].c+=(da.correct||0);accByMonth[m].t+=(da.total||0);
+  });
+  const maxQ=Math.max(...monthKeys.map(m=>monthly[m]||0),1);
+  const bars=monthKeys.map(m=>{
+    const q=monthly[m]||0;
+    const h=Math.max(4,Math.round(q/maxQ*52));
+    const acc=accByMonth[m]&&accByMonth[m].t?Math.round(accByMonth[m].c/accByMonth[m].t*100):null;
+    const col=acc===null?'rgba(184,144,122,0.5)':acc>=80?'rgba(74,222,128,0.7)':acc>=60?'rgba(217,160,96,0.7)':'rgba(248,113,113,0.6)';
+    const shortM=m.slice(5)+'月';
+    return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px" title="${m}: ${q}問${acc!==null?' 正答率'+acc+'%':''}">
+      <div style="font-size:8px;color:#8A7060;font-variant-numeric:tabular-nums">${q}</div>
+      <div style="width:100%;max-width:36px;height:56px;display:flex;align-items:flex-end">
+        <div style="width:100%;height:${h}px;background:${col};border-radius:4px 4px 0 0"></div>
+      </div>
+      <div style="font-size:9px;color:#8A7060">${shortM}</div>
+      ${acc!==null?`<div style="font-size:8px;font-weight:700;color:${acc>=80?'#16a34a':acc>=60?'#D9A060':'#ef4444'}">${acc}%</div>`:'<div style="font-size:8px;color:#ccc">--</div>'}
+    </div>`;
+  }).join('');
+  const totalQ=monthKeys.reduce((s,m)=>s+(monthly[m]||0),0);
+  return `<div style="margin-bottom:14px;padding:12px 14px;background:linear-gradient(135deg,rgba(245,239,232,0.9),rgba(235,225,210,0.85));border:1.5px solid rgba(217,197,178,0.4);border-radius:14px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <div style="font-size:11px;font-weight:700;color:#B8907A">📆 月別学習統計（直近6ヶ月）</div>
+      <div style="font-size:10px;color:#8A6A50">合計: <strong>${totalQ}問</strong></div>
+    </div>
+    <div style="display:flex;gap:4px;align-items:flex-end">${bars}</div>
+    <div style="font-size:9px;color:#8A6A50;margin-top:6px;text-align:center">棒の色: 🟢80%以上 🟡60〜79% 🔴60%未満</div>
+  </div>`;
+}
+
 // 週間学習時間グラフ（直近7日）
 function renderStudyTimeChart(){
   const days=[];
@@ -4569,6 +4645,7 @@ function renderStats(){
       <div id="noaAnalysisOutput" style="display:none;margin-top:8px;padding:12px 14px;background:linear-gradient(135deg,rgba(245,239,232,0.9),rgba(237,224,212,0.85));border:1.5px solid rgba(217,197,178,0.4);border-radius:12px"></div>
     </div>
     <button onclick="if(confirm('記録をすべてリセットしますか？')){localStorage.removeItem('np_history');localStorage.removeItem('np_streak');localStorage.removeItem('np_weekly');localStorage.removeItem('np_badges');localStorage.removeItem('np_today_wrong');localStorage.removeItem('np_mock_history');localStorage.removeItem('np_flash_progress');localStorage.removeItem('np_srs');localStorage.removeItem('np_daily');localStorage.removeItem('np_memos');localStorage.removeItem('np_best');localStorage.removeItem('np_daily_acc');localStorage.removeItem('np_wrong_choices');history={};streakData={lastDate:'',streak:0};weeklyData={};earnedBadges=[];mockHistory=[];flashProgress={};srsData={};dailyChallenge=null;memoData={};bestScores={};dailyAccuracy={};wrongChoices={};updateScoreBadge();renderStats();renderHomeSummary();}" style="margin-top:12px;background:none;border:none;color:#5A5450;font-size:11px;cursor:pointer;font-family:'Noto Sans JP',sans-serif">記録をリセット</button>
+    ${renderMonthlyStats()}
     ${renderStudyTimeChart()}
     ${renderStrengthMap()}
     ${renderRecentHistory()}
