@@ -355,6 +355,7 @@ body.font-xl .explanation{font-size:15px}
     <div id="noaCard" style="margin-bottom:10px"></div>
     <div style="background:rgba(255,255,255,0.85);border:1px solid rgba(85,80,77,0.15);border-radius:14px;padding:10px 14px;margin-bottom:10px" id="goalBar"></div>
     <div id="pomodoroWidget" style="margin-bottom:10px"></div>
+    <div id="todayPlanCard" style="margin-bottom:10px"></div>
     <div class="search-wrap">
       <span style="font-size:16px;color:#aaa">🔍</span>
       <input class="search-input" id="searchInput" placeholder="キーワード検索 / #123でID直接検索" oninput="onSearchInput(this.value)" autocomplete="off">
@@ -798,6 +799,41 @@ function renderGoalBar(){
     <div style="width:${pct}%;height:100%;background:${done?'linear-gradient(90deg,#4ade80,#16a34a)':'linear-gradient(90deg,#D9C5B2,#B8A090)'};border-radius:10px;transition:.5s"></div>
   </div>`;
 }
+function renderTodayPlan(){
+  const el=document.getElementById('todayPlanCard');
+  if(!el) return;
+  const actions=[];
+  // SRS due
+  const srsDue=getSrsDueIds().length;
+  if(srsDue>0) actions.push({icon:'🧠',label:`SRS復習 ${srsDue}問`,desc:'忘れる前に',onclick:`startQuiz('srs')`});
+  // Weak field with most unmastered
+  const fieldWeak=FIELDS.map(f=>{
+    const qs=QUESTIONS.filter(q=>q.field===f);
+    const unmastered=qs.filter(q=>{const h=history[String(q.id)];return h&&h.wrong>0&&h.correct<=h.wrong;}).length;
+    return{f,unmastered};
+  }).filter(x=>x.unmastered>0).sort((a,b)=>b.unmastered-a.unmastered)[0];
+  if(fieldWeak) actions.push({icon:'💪',label:fieldWeak.f.replace('必修・','').replace('一般・','').replace('状況設定・',''),desc:`未克服 ${fieldWeak.unmastered}問`,onclick:`startQuiz('weak')`});
+  // Flagged
+  if(flaggedIds.size>0) actions.push({icon:'🔖',label:`難問特訓 ${flaggedIds.size}問`,desc:'フラグ付き難問',onclick:`startQuiz('flagged')`});
+  // Unread high-stars
+  const unreadStars=QUESTIONS.filter(q=>q.stars>=2&&!history[String(q.id)]).length;
+  if(unreadStars>0) actions.push({icon:'⭐',label:`頻出未解答 ${Math.min(unreadStars,10)}問`,desc:'まだ解いてない重要問題',onclick:`startQuiz('stars3')`});
+  // Today goal not met
+  const todayCnt=weeklyData[todayKey]||0;
+  if(todayCnt<dailyGoal) actions.push({icon:'🎯',label:`今日あと${dailyGoal-todayCnt}問`,desc:'目標達成まで',onclick:`startQuiz('random')`});
+  const shown=actions.slice(0,3);
+  if(!shown.length){el.innerHTML='';return;}
+  el.innerHTML=`<div style="padding:10px 14px;background:linear-gradient(135deg,rgba(245,239,232,0.9),rgba(237,224,212,0.85));border:1.5px solid rgba(217,197,178,0.4);border-radius:14px">
+    <div style="font-size:11px;font-weight:700;color:#B8907A;margin-bottom:8px">✨ 今日のおすすめアクション</div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      ${shown.map((a,i)=>`<button onclick="${a.onclick}" style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:rgba(255,255,255,0.7);border:1px solid rgba(217,197,178,0.4);border-radius:10px;cursor:pointer;text-align:left;font-family:'Noto Sans JP',sans-serif;width:100%">
+        <span style="font-size:18px;min-width:24px">${a.icon}</span>
+        <span style="flex:1"><span style="display:block;font-size:12px;font-weight:700;color:#55504D">${a.label}</span><span style="font-size:10px;color:#8A6A50">${a.desc}</span></span>
+        <span style="font-size:12px;color:#B8A090">›</span>
+      </button>`).join('')}
+    </div>
+  </div>`;
+}
 function renderNoaCard(){
   const el=document.getElementById('noaCard');
   if(!el) return;
@@ -961,6 +997,16 @@ function updateDailyStats(){
   pulseSummaryCard('todayDisp');
 }
 
+// ===== 解説テキスト強調 =====
+function highlightExplanation(text){
+  // Highlight numbers with clinical units
+  let h=text.replace(/(\d+(?:\.\d+)?(?:〜\d+(?:\.\d+)?)?)\s*(mL|L|mg|g|kg|mmHg|cmH2O|回\/分|回\/min|℃|%|kcal|mEq\/L|mg\/dL|μg|ng|IU|単位|秒|分|時間|日|週|か月|ヶ月|ヵ月|歳|cm|mm|μm|nm|rpm|bpm)/g,
+    '<span style="color:#c2410c;font-weight:700">$1$2</span>');
+  // Highlight important clinical terms
+  const terms=['正常','基準値','注意','重要','禁忌','必須','代表的','ポイント','国試頻出'];
+  terms.forEach(t=>{h=h.replace(new RegExp(`(${t})`,'g'),'<span style="background:rgba(254,240,138,0.6);border-radius:2px;padding:0 2px">$1</span>');});
+  return h;
+}
 // ===== ポモドーロタイマー =====
 let pomState={mode:'work',remaining:25*60,running:false,interval:null,expanded:false,sessions:0};
 function initPomodoro(){renderPomodoro();}
@@ -1209,8 +1255,8 @@ function switchTab(t){
   if(t==='stats') renderStats();
   if(t==='noa') initChat();
   document.getElementById('quizArea').style.display='none';
-  // Show resume banner if a valid snapshot exists and quiz isn't active
-  if(t==='home'){showResumeBanner();}
+  // Refresh home widgets when returning
+  if(t==='home'){showResumeBanner();renderTodayPlan();}
 }
 
 // CATEGORY SELECT
@@ -1773,7 +1819,7 @@ function autoAnswerTimeout(){
   if(choices){
     const res=document.createElement('div');
     res.className='result-area wrong';
-    res.innerHTML='<div class="result-label">⏰ 時間切れ！</div><div class="explanation">'+q.explanation+'</div>';
+    res.innerHTML='<div class="result-label">⏰ 時間切れ！</div><div class="explanation">'+highlightExplanation(q.explanation)+'</div>';
     choices.after(res);
     const nb=document.createElement('button');nb.className='next-btn';nb.id='nextBtn';
     const isLast=session.idx>=session.pool.length-1;
@@ -1896,7 +1942,7 @@ function answer(key){
     </div>
   </div>
   <div style="font-size:12px;color:${correct?'#166534':'#B8A090'};font-weight:600;margin:4px 0 6px;padding:4px 8px;background:${correct?'rgba(74,222,128,0.08)':'rgba(217,197,178,0.08)'};border-radius:8px">${nmsg}</div>
-  ${wrongAns}${correctAns}<div class="explanation" style="position:relative">${q.explanation}<button onclick="navigator.clipboard.writeText('Q: '+this.closest('.explanation').textContent.trim()).then(()=>showToast('解説をコピーしました'))" style="position:absolute;top:4px;right:4px;padding:2px 6px;background:rgba(240,232,222,0.8);border:1px solid rgba(85,80,77,0.15);border-radius:6px;font-size:10px;color:#8A6A50;cursor:pointer;font-family:'Noto Sans JP',sans-serif" title="解説をコピー">📋</button></div>
+  ${wrongAns}${correctAns}<div class="explanation" style="position:relative">${highlightExplanation(q.explanation)}<button onclick="navigator.clipboard.writeText('Q: '+this.closest('.explanation').textContent.trim()).then(()=>showToast('解説をコピーしました'))" style="position:absolute;top:4px;right:4px;padding:2px 6px;background:rgba(240,232,222,0.8);border:1px solid rgba(85,80,77,0.15);border-radius:6px;font-size:10px;color:#8A6A50;cursor:pointer;font-family:'Noto Sans JP',sans-serif" title="解説をコピー">📋</button></div>
   ${(()=>{const h=history[q.id];if(!h||h.correct+h.wrong<1) return '';const tot=h.correct+h.wrong;const acc=Math.round(h.correct/tot*100);const srs=srsData[q.id];const accColor=acc>=80?'#16a34a':acc>=60?'#D9A060':'#ef4444';return `<div style="margin-top:6px;padding:4px 10px;background:rgba(237,224,212,0.2);border-radius:8px;font-size:10px;color:#8A6A50;display:flex;gap:10px;align-items:center">この問題: <strong style="color:${accColor}">${acc}%</strong>正答 (${tot}回挑戦)${srs?` · 次の復習: ${srs.due<=todayKey?'今日！':`${Math.max(1,Math.ceil((new Date(srs.due)-new Date())/86400000))}日後`}`:''}</div>`;})()}
   ${hasMemo?`<div style="margin-top:8px;padding:8px 10px;background:rgba(217,185,80,0.1);border-left:3px solid #D9A060;border-radius:6px;font-size:12px;color:#5A4420">📝 <strong>マイメモ：</strong>${memoData[q.id]}</div>`:''}
   ${(()=>{
@@ -2330,6 +2376,14 @@ function renderStats(){
     const t=c+w;
     return{c,w,t,rate:t?Math.round(c/t*100):null,total:qs.length};
   }
+  function getMasteryLevel(cov,acc){
+    if(cov>=95&&acc>=90) return{lv:5,label:'エキスパート',color:'#7c3aed',bg:'rgba(124,58,237,0.1)',border:'rgba(124,58,237,0.3)'};
+    if(cov>=80&&acc>=80) return{lv:4,label:'マスター',color:'#16a34a',bg:'rgba(74,222,128,0.1)',border:'rgba(74,222,128,0.3)'};
+    if(cov>=60&&acc>=70) return{lv:3,label:'上級',color:'#2563eb',bg:'rgba(59,130,246,0.1)',border:'rgba(59,130,246,0.3)'};
+    if(cov>=30&&acc>=50) return{lv:2,label:'中級',color:'#D9A060',bg:'rgba(217,160,96,0.1)',border:'rgba(217,160,96,0.3)'};
+    if(cov>=10) return{lv:1,label:'初級',color:'#8A6A50',bg:'rgba(138,106,80,0.1)',border:'rgba(138,106,80,0.25)'};
+    return{lv:0,label:'未着手',color:'#aaa',bg:'rgba(237,224,212,0.2)',border:'rgba(217,197,178,0.2)'};
+  }
   function fieldBar(f){
     const qs=QUESTIONS.filter(q=>q.field===f);
     const attempted=qs.filter(q=>history[String(q.id)]);
@@ -2340,12 +2394,13 @@ function renderStats(){
     const cov=Math.round(attempted.length/qs.length*100);
     const label=f.replace('必修・','').replace('一般・','').replace('状況設定・','');
     const accColor=acc===null?'#aaa':acc>=80?'#16a34a':acc>=60?'#D9A060':'#ef4444';
+    const mastery=getMasteryLevel(cov,acc!==null?acc:0);
     return `<div style="margin-bottom:10px">
-      <div style="display:flex;justify-content:space-between;font-size:11px;color:#55504D;margin-bottom:3px">
-        <span style="font-weight:600">${label}</span>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:#55504D;margin-bottom:3px;align-items:center">
+        <span style="display:flex;align-items:center;gap:5px;font-weight:600">${label}<span style="padding:1px 6px;background:${mastery.bg};border:1px solid ${mastery.border};border-radius:8px;font-size:9px;color:${mastery.color};font-weight:700">Lv${mastery.lv} ${mastery.label}</span></span>
         <span style="display:flex;gap:8px">
           <span style="color:${accColor};font-weight:700">${acc!==null?acc+'%正答':'未解答'}</span>
-          <span style="color:#8A6A50">${cov}%カバー(${attempted.length}/${qs.length})</span>
+          <span style="color:#8A6A50">${cov}%</span>
         </span>
       </div>
       <div style="display:flex;gap:3px;height:8px">
@@ -2875,7 +2930,7 @@ function ansJok(key){
     '<div style="display:flex;gap:2px"><button class="memo-btn" id="memoBtn'+q.id+'" onclick="openMemo('+q.id+')" title="メモ" style="color:'+(hasMemo2?'#D9A060':'#8A7060')+'">'+(hasMemo2?'📝':'📋')+'</button>'+
     '<button class="bm-btn" id="bmBtn'+q.id+'" onclick="toggleBookmark('+q.id+')" title="'+(isBm2?'ブックマーク済み':'ブックマーク')+'">'+(isBm2?'🔖':'🤍')+'</button></div></div>'+
     '<div style="font-size:12px;font-weight:600;margin:4px 0 6px;padding:4px 8px;border-radius:8px;background:'+(ok?'rgba(74,222,128,0.08)':'rgba(217,197,178,0.08)')+';color:'+(ok?'#166534':'#B8A090')+'">'+nmsg+'</div>'+
-    '<div class="explanation">'+q.explanation+'</div>';
+    '<div class="explanation">'+highlightExplanation(q.explanation)+'</div>';
   ch2.after(res);
   var mc=createMiniChat(q);
   res.after(mc);
@@ -3665,6 +3720,7 @@ renderExamCountdown();
 renderGoalBar();renderNoaCard();renderDailyBanner();
 showResumeBanner();
 initPomodoro();
+renderTodayPlan();
 </script>
 </body>
 </html>
