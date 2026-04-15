@@ -362,6 +362,7 @@ body.font-xl .explanation{font-size:15px}
       <button onclick="clearSearch()" style="background:none;border:none;color:#aaa;font-size:14px;cursor:pointer;padding:2px 4px;display:none" id="searchClear">✕</button>
     </div>
     <div class="search-results" id="searchResults"></div>
+    <div id="weakFieldQuick" style="margin-bottom:10px"></div>
     <div id="dailyBanner" style="margin-bottom:10px"></div>
     <button onclick="startQuiz('mock')" style="width:100%;margin-bottom:12px;padding:14px 16px;background:linear-gradient(135deg,#6B5040,#8A6A50);color:white;border:none;border-radius:18px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;box-shadow:0 4px 16px rgba(107,80,64,0.3);display:flex;align-items:center;justify-content:center;gap:10px">
       <span style="font-size:20px">📝</span>
@@ -768,12 +769,27 @@ function pulseSummaryCard(id){
 }
 // ===== TTS（音声読み上げ）=====
 let ttsActive=false;
+let ttsRate=parseFloat(localStorage.getItem('np_tts_rate')||'0.88');
+const TTS_SPEEDS=[{label:'遅い',rate:0.65},{label:'普通',rate:0.88},{label:'速い',rate:1.25}];
+function setTtsSpeed(rate){
+  ttsRate=rate;localStorage.setItem('np_tts_rate',rate);
+  document.querySelectorAll('.tts-speed-btn').forEach(b=>{
+    b.style.background=parseFloat(b.dataset.rate)===rate?'rgba(217,160,96,0.35)':'rgba(240,232,222,0.7)';
+    b.style.fontWeight=parseFloat(b.dataset.rate)===rate?'700':'400';
+  });
+  showToast(`読み上げ速度: ${TTS_SPEEDS.find(s=>s.rate===rate)?.label||'普通'}`);
+}
+function renderTtsSpeedBtns(){
+  return `<span style="display:inline-flex;gap:3px;align-items:center;margin-left:4px">` +
+    TTS_SPEEDS.map(s=>`<button class="tts-speed-btn" data-rate="${s.rate}" onclick="setTtsSpeed(${s.rate})" style="padding:3px 7px;background:${ttsRate===s.rate?'rgba(217,160,96,0.35)':'rgba(240,232,222,0.7)'};border:1px solid rgba(85,80,77,0.2);border-radius:8px;font-size:10px;color:#8A6A50;cursor:pointer;font-family:'Noto Sans JP',sans-serif;font-weight:${ttsRate===s.rate?'700':'400'}">${s.label}</button>`).join('') +
+    `</span>`;
+}
 function speakText(text){
   if(!window.speechSynthesis) return;
   speechSynthesis.cancel();
   if(ttsActive){ttsActive=false;return;}
   const utt=new SpeechSynthesisUtterance(text.replace(/<[^>]+>/g,''));
-  utt.lang='ja-JP';utt.rate=0.88;utt.pitch=1.0;
+  utt.lang='ja-JP';utt.rate=ttsRate;utt.pitch=1.0;
   utt.onstart=()=>{ttsActive=true;};
   utt.onend=()=>{ttsActive=false;updateTtsBtn(false);};
   utt.onerror=()=>{ttsActive=false;};
@@ -832,6 +848,49 @@ function renderGoalBar(){
   <div style="height:6px;background:rgba(237,224,212,0.4);border-radius:10px;overflow:hidden">
     <div style="width:${pct}%;height:100%;background:${done?'linear-gradient(90deg,#4ade80,#16a34a)':'linear-gradient(90deg,#D9C5B2,#B8A090)'};border-radius:10px;transition:.5s"></div>
   </div>`;
+}
+// 苦手分野クイック強化ボタン（ホーム画面）
+function renderWeakFieldQuick(){
+  const el=document.getElementById('weakFieldQuick');
+  if(!el) return;
+  // Rank fields by worst accuracy (min 5 answered)
+  const ranked=FIELDS.map(f=>{
+    const qs=QUESTIONS.filter(q=>q.field===f&&q.category===currentCategory);
+    if(!qs.length) return null;
+    const c=qs.reduce((s,q)=>{const h=history[String(q.id)];return s+(h?h.correct:0);},0);
+    const w=qs.reduce((s,q)=>{const h=history[String(q.id)];return s+(h?h.wrong:0);},0);
+    const t=c+w;
+    if(t<5) return null;
+    return{f,acc:Math.round(c/t*100),wrong:w,label:f.replace('必修・','').replace('一般・','').replace('状況設定・','')};
+  }).filter(Boolean).sort((a,b)=>a.acc-b.acc).slice(0,3);
+  if(!ranked.length){el.innerHTML='';return;}
+  el.innerHTML=`<div style="padding:10px 14px;background:rgba(254,242,242,0.7);border:1.5px solid rgba(252,165,165,0.35);border-radius:14px">
+    <div style="font-size:11px;font-weight:700;color:#dc2626;margin-bottom:8px">🎯 苦手分野クイック強化</div>
+    <div style="display:flex;flex-direction:column;gap:5px">
+      ${ranked.map(r=>{
+        const barW=Math.max(5,r.acc);
+        const barColor=r.acc<50?'rgba(239,68,68,0.55)':r.acc<70?'rgba(234,179,8,0.55)':'rgba(74,222,128,0.55)';
+        return `<button onclick="startFieldFocus('${r.f}')" style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:rgba(255,255,255,0.7);border:1px solid rgba(252,165,165,0.3);border-radius:10px;cursor:pointer;text-align:left;font-family:'Noto Sans JP',sans-serif;width:100%">
+          <span style="flex:1">
+            <span style="display:block;font-size:12px;font-weight:700;color:#55504D">${r.label}</span>
+            <span style="display:block;height:4px;background:rgba(237,224,212,0.4);border-radius:4px;margin-top:4px;overflow:hidden"><span style="display:block;width:${barW}%;height:100%;background:${barColor};border-radius:4px"></span></span>
+          </span>
+          <span style="font-size:13px;font-weight:700;color:${r.acc<50?'#dc2626':r.acc<70?'#d97706':'#16a34a'}">${r.acc}%</span>
+          <span style="font-size:11px;color:#B8A090">›</span>
+        </button>`;
+      }).join('')}
+    </div>
+  </div>`;
+}
+function startFieldFocus(field){
+  // Quiz on specified field, weak questions prioritized
+  const catQ=QUESTIONS.filter(q=>q.field===field);
+  const weakFirst=catQ.filter(q=>{const h=history[String(q.id)];return h&&h.wrong>0;});
+  const others=catQ.filter(q=>!weakFirst.find(x=>x.id===q.id));
+  const pool=[...shuffle(weakFirst),...shuffle(others)].slice(0,10);
+  if(!pool.length){alert('この分野に問題がありません。');return;}
+  session={pool,idx:0,correct:0,wrong:0,mode:'field'};
+  showQuiz();
 }
 function renderTodayPlan(){
   const el=document.getElementById('todayPlanCard');
@@ -1661,6 +1720,7 @@ function endFlash(){
   renderHomeSummary();
   renderExamCountdown();
   renderGoalBar();renderNoaCard();
+  renderWeakFieldQuick();
   initModeButtons();
 }
 
@@ -2120,7 +2180,7 @@ function answer(key){
     </div>`;
   })()}
   <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-    ${window.speechSynthesis?`<button class="tts-btn" onclick="speakText('${(q.question+' 正解は'+q.choices[q.answer]+' 解説: '+q.explanation).replace(/'/g,'&apos;')}')">🔊 読み上げ</button>`:''}
+    ${window.speechSynthesis?`<button class="tts-btn" onclick="speakText('${(q.question+' 正解は'+q.choices[q.answer]+' 解説: '+q.explanation).replace(/'/g,'&apos;')}')">🔊 読み上げ</button>${renderTtsSpeedBtns()}`:''}
     <button id="flagBtn_${q.id}" onclick="flagQuestion(${q.id})" style="padding:5px 10px;background:${flaggedIds.has(q.id)?'rgba(239,68,68,0.12)':'rgba(240,232,222,0.8)'};color:${flaggedIds.has(q.id)?'#dc2626':'#8A6A50'};border:1px solid rgba(85,80,77,0.2);border-radius:16px;font-size:11px;cursor:pointer;font-family:'Noto Sans JP',sans-serif">${flaggedIds.has(q.id)?'🔖 フラグ済み':'🤔 難しかった'}</button>
     ${(()=>{const s=srsData[q.id];if(!s)return'';const due=new Date(s.due);const today2=new Date(todayKey);const diff=Math.round((due-today2)/(1000*60*60*24));const label=diff<=0?'今日':diff===1?'明日':`${diff}日後（${s.due.slice(5)}）`;return`<span style="font-size:10px;color:#8A6A50;padding:4px 8px;background:rgba(240,232,222,0.6);border-radius:10px;white-space:nowrap">📅 次回SRS: ${label}</span>`;})()}
   </div>
@@ -2206,9 +2266,18 @@ function finishQuiz(){
     const hPass=hPct>=80;
     function pctRow(label,c,t,pct,passMark){
       const ok=pct>=passMark;
-      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid rgba(0,0,0,0.05)">
-        <span style="font-size:12px;color:#55504D">${label}</span>
-        <span style="font-size:12px;font-weight:700;color:${ok?'#16a34a':'#991b1b'}">${pct}%（${c}/${t}問）${ok?'✓':'✗'}</span>
+      const passLineLeft=passMark+'%';
+      const barColor=ok?'rgba(74,222,128,0.65)':'rgba(248,113,113,0.65)';
+      return `<div style="padding:7px 0;border-bottom:1px solid rgba(0,0,0,0.05)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <span style="font-size:12px;color:#55504D;font-weight:600">${label}</span>
+          <span style="font-size:12px;font-weight:700;color:${ok?'#16a34a':'#991b1b'}">${pct}%（${c}/${t}問）${ok?'✓ 合格':'✗ 不合格'}</span>
+        </div>
+        <div style="position:relative;height:10px;background:rgba(237,224,212,0.4);border-radius:6px;overflow:visible">
+          <div style="position:absolute;left:0;top:0;height:100%;width:${pct}%;background:${barColor};border-radius:6px;transition:width .5s ease"></div>
+          <div style="position:absolute;left:${passLineLeft};top:-2px;height:14px;width:2px;background:rgba(22,163,74,0.7);border-radius:2px" title="合格ライン${passMark}%"></div>
+        </div>
+        <div style="font-size:9px;color:#8A6A50;margin-top:2px;text-align:right">合格ライン ${passMark}%</div>
       </div>`;
     }
     mockResult=`<div style="margin:0 0 14px;padding:12px 16px;border-radius:14px;background:rgba(240,232,222,0.6);border:1.5px solid rgba(85,80,77,0.2);text-align:left">
