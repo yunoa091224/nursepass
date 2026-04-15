@@ -395,6 +395,9 @@ body.font-xl .explanation{font-size:15px}
         <button class="chip" id="weakFilterbookmark" onclick="setWeakFilter('bookmark')" style="margin-left:4px">🔖 ブックマーク</button>
         <button class="chip" id="weakFiltermemo" onclick="setWeakFilter('memo')">📝 メモ</button>
         <button class="chip" id="weakFilterbrowse" onclick="setWeakFilter('browse')" style="margin-left:4px">📋 全問</button>
+        <button class="chip" id="weakFilterimportant" onclick="setWeakFilter('tag_important')" style="margin-left:4px">⭐重要</button>
+        <button class="chip" id="weakFilterhard" onclick="setWeakFilter('tag_hard')">🔴難解</button>
+        <button class="chip" id="weakFilterreview" onclick="setWeakFilter('tag_review')">🔵復習</button>
       </div>
       <div style="padding:0 16px 8px">
         <input type="search" id="weakSearchInput" placeholder="🔍 キーワードで問題を検索..." oninput="onWeakSearch(this.value)"
@@ -405,6 +408,7 @@ body.font-xl .explanation{font-size:15px}
         <button class="chip selected" id="weakSortWrong" onclick="setWeakSort('wrong')" style="font-size:10px;padding:3px 8px">間違え多い順</button>
         <button class="chip" id="weakSortAcc" onclick="setWeakSort('acc')" style="font-size:10px;padding:3px 8px">正答率低い順</button>
         <button class="chip" id="weakSortStreak" onclick="setWeakSort('streak')" style="font-size:10px;padding:3px 8px">未克服優先</button>
+        <button id="hideMasteredBtn" onclick="toggleHideMastered()" style="font-size:10px;padding:3px 8px;background:rgba(240,232,222,0.8);border:1.5px solid rgba(124,58,237,0.25);border-radius:16px;color:#7c3aed;cursor:pointer;font-family:'Noto Sans JP',sans-serif;margin-left:4px">習得済みを非表示</button>
       </div>
       <div id="weakSummaryBar" style="padding:0 16px 8px;font-size:11px;color:#8A6A50"></div>
       <div class="weak-list" id="weakList"></div>
@@ -488,6 +492,22 @@ let weeklyData = JSON.parse(localStorage.getItem('np_weekly')||'{}');
 let streakFreeze = JSON.parse(localStorage.getItem('np_streak_freeze')||'null');
 const todayKey = new Date().toISOString().slice(0,10);
 let bookmarks = JSON.parse(localStorage.getItem('np_bookmarks')||'{}');
+let bmTags = JSON.parse(localStorage.getItem('np_bm_tags')||'{}'); // {id: 'important'|'hard'|'review'}
+function saveBmTags(){localStorage.setItem('np_bm_tags',JSON.stringify(bmTags));}
+const BM_TAG_DEFS={important:{label:'⭐重要',color:'rgba(234,179,8,0.2)',border:'rgba(234,179,8,0.4)',text:'#b45309'},hard:{label:'🔴難解',color:'rgba(239,68,68,0.12)',border:'rgba(239,68,68,0.35)',text:'#dc2626'},review:{label:'🔵復習',color:'rgba(59,130,246,0.12)',border:'rgba(59,130,246,0.3)',text:'#2563eb'}};
+function toggleBmTag(id,tag){
+  if(bmTags[id]===tag){delete bmTags[id];}else{bmTags[id]=tag;}
+  saveBmTags();
+  // Update tag buttons if visible
+  renderBmTagBtns(id);
+  showToast(bmTags[id]?`${BM_TAG_DEFS[tag].label}タグを設定しました`:'タグを解除しました');
+}
+function renderBmTagBtns(id){
+  const el=document.getElementById('bmTagRow_'+id);
+  if(!el) return;
+  const cur=bmTags[id];
+  el.innerHTML=Object.entries(BM_TAG_DEFS).map(([k,d])=>`<button onclick="toggleBmTag(${id},'${k}')" style="padding:3px 8px;background:${cur===k?d.color:'rgba(240,232,222,0.7)'};border:1px solid ${cur===k?d.border:'rgba(217,197,178,0.4)'};border-radius:12px;font-size:10px;font-weight:${cur===k?'700':'400'};color:${cur===k?d.text:'#8A6A50'};cursor:pointer;font-family:'Noto Sans JP',sans-serif">${d.label}</button>`).join('');
+}
 function saveBookmarks(){localStorage.setItem('np_bookmarks',JSON.stringify(bookmarks));}
 function toggleBookmark(id){
   if(bookmarks[id]) delete bookmarks[id];
@@ -2277,6 +2297,7 @@ function autoAnswerTimeout(){
     res.className='result-area wrong';
     res.innerHTML='<div class="result-label">⏰ 時間切れ！</div><div class="explanation">'+highlightExplanation(q.explanation)+'</div>';
     choices.after(res);
+    if(isBm) renderBmTagBtns(q.id);
     const nb=document.createElement('button');nb.className='next-btn';nb.id='nextBtn';
     const isLast=session.idx>=session.pool.length-1;
     nb.textContent=isLast?'結果を見る →':'次の問題 →';
@@ -2413,6 +2434,7 @@ function answer(key){
       <button class="bm-btn" id="bmBtn${q.id}" onclick="toggleBookmark(${q.id})" title="${isBm?'ブックマーク済み':'ブックマーク'}">${isBm?'🔖':'🤍'}</button>
     </div>
   </div>
+  ${isBm?`<div id="bmTagRow_${q.id}" style="display:flex;gap:5px;margin:4px 0 6px;flex-wrap:wrap"></div>`:''}
   <div style="font-size:12px;color:${correct?'#166534':'#B8A090'};font-weight:600;margin:4px 0 6px;padding:4px 8px;background:${correct?'rgba(74,222,128,0.08)':'rgba(217,197,178,0.08)'};border-radius:8px">${nmsg}</div>
   ${wrongAns}${correctAns}<div class="explanation" style="position:relative">${highlightExplanation(q.explanation)}<button onclick="navigator.clipboard.writeText('Q: '+this.closest('.explanation').textContent.trim()).then(()=>showToast('解説をコピーしました'))" style="position:absolute;top:4px;right:4px;padding:2px 6px;background:rgba(240,232,222,0.8);border:1px solid rgba(85,80,77,0.15);border-radius:6px;font-size:10px;color:#8A6A50;cursor:pointer;font-family:'Noto Sans JP',sans-serif" title="解説をコピー">📋</button></div>
   ${(()=>{const h=history[q.id];if(!h||h.correct+h.wrong<1) return '';const tot=h.correct+h.wrong;const acc=Math.round(h.correct/tot*100);const srs=srsData[q.id];const accColor=acc>=80?'#16a34a':acc>=60?'#D9A060':'#ef4444';return `<div style="margin-top:6px;padding:4px 10px;background:rgba(237,224,212,0.2);border-radius:8px;font-size:10px;color:#8A6A50;display:flex;gap:10px;align-items:center">この問題: <strong style="color:${accColor}">${acc}%</strong>正答 (${tot}回挑戦)${srs?` · 次の復習: ${srs.due<=todayKey?'今日！':`${Math.max(1,Math.ceil((new Date(srs.due)-new Date())/86400000))}日後`}`:''}</div>`;})()}
@@ -2713,6 +2735,14 @@ function backHome(){
 let weakFilter='all';
 let weakSearchText='';
 let weakSort='wrong';
+let hideMastered=false;
+function toggleHideMastered(){
+  hideMastered=!hideMastered;
+  const btn=document.getElementById('hideMasteredBtn');
+  if(btn){btn.style.background=hideMastered?'rgba(124,58,237,0.18)':'rgba(240,232,222,0.8)';btn.style.fontWeight=hideMastered?'700':'400';btn.textContent=hideMastered?'✓習得済み非表示':'習得済みを非表示';}
+  renderWeak();
+}
+function isMastered(h){return h&&h.correct>=3&&h.correct>h.wrong;}
 function setWeakSort(s){
   weakSort=s;
   ['wrong','acc','streak'].forEach(k=>{
@@ -2726,6 +2756,10 @@ function setWeakFilter(f){
   ['all','必修','一般','状況設定','bookmark','memo','browse'].forEach(k=>{
     const btn=document.getElementById('weakFilter'+(k==='all'?'All':k));
     if(btn) btn.classList.toggle('selected',k===f);
+  });
+  ['important','hard','review'].forEach(k=>{
+    const btn=document.getElementById('weakFilter'+k);
+    if(btn) btn.classList.toggle('selected',f==='tag_'+k);
   });
   renderWeak();
 }
@@ -2765,6 +2799,23 @@ function renderWeak(){
   const mastered=allWeak.filter(id=>history[id].correct>history[id].wrong).length;
   const bmCount=Object.keys(bookmarks).length;
   let items=[];
+  if(weakFilter&&weakFilter.startsWith('tag_')){
+    const tagKey=weakFilter.slice(4);
+    const tagDef=BM_TAG_DEFS[tagKey];
+    items=Object.entries(bmTags).filter(([id,t])=>t===tagKey).map(([id])=>{const q=QUESTIONS.find(x=>x.id==id);return q?{id,q}:null;}).filter(Boolean);
+    if(sb) sb.innerHTML=`${tagDef.label} タグ <strong style="color:#B8907A">${items.length}</strong>問`;
+    if(wb) wb.style.display=items.length?'block':'none';
+    if(!items.length){wl.innerHTML=`<div class="empty">${tagDef.label}タグの問題はありません。<br>問題解答後にタグを付けてみて！</div>`;return;}
+    wl.innerHTML=items.map(({id,q})=>{
+      const h=history[id];
+      const acc=h&&h.correct+h.wrong?Math.round(h.correct/(h.correct+h.wrong)*100)+'%':'未解答';
+      return `<div class="weak-item" onclick="drillOne(${q.id})" style="border-color:${tagDef.border};background:${tagDef.color}">
+        <div class="weak-q">${tagDef.label} ${q.question}</div>
+        <div class="weak-meta">${q.field.replace('必修・','').replace('一般・','').replace('状況設定・','')} · 正答率: ${acc}</div>
+      </div>`;
+    }).join('');
+    return;
+  }
   if(weakFilter==='bookmark'){
     items=Object.keys(bookmarks).map(id=>{const q=QUESTIONS.find(x=>x.id==id);return q?{id,q}:null;}).filter(Boolean);
     if(sb) sb.innerHTML=`ブックマーク <strong style="color:#B8907A">${bmCount}</strong>問`;
@@ -2845,9 +2896,10 @@ function renderWeak(){
     return;
   }
   let weakIds=allWeak;
-  if(weakFilter!=='all'){
+  if(weakFilter!=='all'&&!weakFilter.startsWith('tag_')){
     weakIds=allWeak.filter(id=>{const q=QUESTIONS.find(x=>x.id==id);return q&&q.category===weakFilter;});
   }
+  if(hideMastered){weakIds=weakIds.filter(id=>!isMastered(history[id]));}
   if(weakSort==='acc'){
     weakIds.sort((a,b)=>{const ha=history[a],hb=history[b];const ra=ha.correct/(ha.correct+ha.wrong);const rb=hb.correct/(hb.correct+hb.wrong);return ra-rb;});
   } else if(weakSort==='streak'){
@@ -2905,6 +2957,49 @@ function drillOne(id){
   showQuiz();
 }
 
+// のあ先生AI学習分析
+async function requestNoaAnalysis(){
+  const key=localStorage.getItem('np_openai_key');
+  if(!key){showApiKeyModal();return;}
+  const btn=document.getElementById('noaAnalysisBtn');
+  const out=document.getElementById('noaAnalysisOutput');
+  if(!btn||!out) return;
+  btn.disabled=true;btn.textContent='分析中...';
+  out.style.display='block';out.innerHTML='<div style="color:#8A6A50;font-size:12px">のあ先生が分析しています…</div>';
+  // Build stats summary
+  const total=Object.keys(history).length;
+  const answered=Object.values(history).reduce((s,h)=>s+h.correct+h.wrong,0);
+  const correct=Object.values(history).reduce((s,h)=>s+h.correct,0);
+  const rate=answered?Math.round(correct/answered*100):0;
+  const streak=streakData.streak||0;
+  const today=weeklyData[todayKey]||0;
+  const srsCount=getSrsDueIds().length;
+  const weakFields=FIELDS.map(f=>{
+    const qs=QUESTIONS.filter(q=>q.field===f);
+    const c=qs.reduce((s,q)=>{const h=history[String(q.id)];return s+(h?h.correct:0);},0);
+    const w=qs.reduce((s,q)=>{const h=history[String(q.id)];return s+(h?h.wrong:0);},0);
+    return{f:f.replace('必修・','').replace('一般・','').replace('状況設定・',''),t:c+w,rate:c+w?Math.round(c/(c+w)*100):null};
+  }).filter(x=>x.t>=5).sort((a,b)=>a.rate-b.rate).slice(0,3);
+  const examDays=getExamDays();
+  const summary=`学習者の現在の状況:\n- 解答済み問題数: ${total}/${QUESTIONS.length}問（カバー率${Math.round(total/QUESTIONS.length*100)}%）\n- 全体正答率: ${rate}%\n- 連続学習日数: ${streak}日\n- 今日解いた問題数: ${today}問\n- SRS期限問題数: ${srsCount}問\n- 苦手分野トップ3: ${weakFields.map(x=>`${x.f}(${x.rate}%)`).join('、')||'なし'}\n- 試験まで: ${examDays!==null?examDays+'日':'不明'}`;
+  try{
+    const res=await fetch('https://api.openai.com/v1/chat/completions',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
+      body:JSON.stringify({model:'gpt-4o-mini',messages:[
+        {role:'system',content:'あなたは看護師国家試験対策アプリ「NursePass」のAIコーチ「のあ先生（叶愛）」です。静かなやさしさで不安な心に寄り添い、温かく励ます口調で学習アドバイスをします。200字以内で簡潔に。'},
+        {role:'user',content:`以下の学習データに基づき、具体的で実用的な学習アドバイスをください。\n\n${summary}`}
+      ],max_tokens:250,temperature:0.7})
+    });
+    if(!res.ok) throw new Error('API error '+res.status);
+    const data=await res.json();
+    const reply=data.choices?.[0]?.message?.content||'うまく取得できなかったよ。もう一度試してね。';
+    out.innerHTML=`<div style="display:flex;gap:10px;align-items:flex-start"><div style="font-size:20px">🌸</div><div style="flex:1"><div style="font-size:12px;color:#55504D;line-height:1.7">${reply.replace(/\n/g,'<br>')}</div><div style="font-size:9px;color:#aaa;margin-top:6px">のあ先生 · ${new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}</div></div></div>`;
+  }catch(e){
+    out.innerHTML=`<div style="font-size:11px;color:#dc2626">分析に失敗しました。もう一度お試しください。</div>`;
+  }
+  btn.disabled=false;btn.textContent='🌸 のあ先生に分析してもらう';
+}
 // SRS 今後7日間の復習予定グラフ
 function renderSrsForecast(){
   const forecast=[];
@@ -3522,6 +3617,10 @@ function renderStats(){
       <button onclick="exportCSV()" style="padding:7px 14px;background:rgba(22,163,74,0.1);color:#15803d;border:1.5px solid rgba(22,163,74,0.25);border-radius:10px;font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif">📊 CSVエクスポート</button>
       <button onclick="importData()" style="padding:7px 14px;background:rgba(74,222,128,0.1);color:#166534;border:1.5px solid rgba(74,222,128,0.25);border-radius:10px;font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif">📥 データをインポート</button>
       <button onclick="setupReminder()" style="padding:7px 14px;background:rgba(245,158,11,0.1);color:#b45309;border:1.5px solid rgba(245,158,11,0.25);border-radius:10px;font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif" id="reminderBtn">🔔 ${localStorage.getItem('np_reminder')?'リマインダー設定済み':'学習リマインダー'}</button>
+    </div>
+    <div style="margin-top:12px">
+      <button id="noaAnalysisBtn" onclick="requestNoaAnalysis()" style="width:100%;padding:10px;background:linear-gradient(135deg,rgba(245,239,232,0.9),rgba(237,224,212,0.8));border:1.5px solid rgba(217,197,178,0.5);border-radius:12px;font-size:13px;font-weight:700;color:#B8907A;cursor:pointer;font-family:'Noto Sans JP',sans-serif">🌸 のあ先生に学習分析してもらう</button>
+      <div id="noaAnalysisOutput" style="display:none;margin-top:8px;padding:12px 14px;background:linear-gradient(135deg,rgba(245,239,232,0.9),rgba(237,224,212,0.85));border:1.5px solid rgba(217,197,178,0.4);border-radius:12px"></div>
     </div>
     <button onclick="if(confirm('記録をすべてリセットしますか？')){localStorage.removeItem('np_history');localStorage.removeItem('np_streak');localStorage.removeItem('np_weekly');localStorage.removeItem('np_badges');localStorage.removeItem('np_today_wrong');localStorage.removeItem('np_mock_history');localStorage.removeItem('np_flash_progress');localStorage.removeItem('np_srs');localStorage.removeItem('np_daily');localStorage.removeItem('np_memos');localStorage.removeItem('np_best');localStorage.removeItem('np_daily_acc');localStorage.removeItem('np_wrong_choices');history={};streakData={lastDate:'',streak:0};weeklyData={};earnedBadges=[];mockHistory=[];flashProgress={};srsData={};dailyChallenge=null;memoData={};bestScores={};dailyAccuracy={};wrongChoices={};updateScoreBadge();renderStats();renderHomeSummary();}" style="margin-top:12px;background:none;border:none;color:#5A5450;font-size:11px;cursor:pointer;font-family:'Noto Sans JP',sans-serif">記録をリセット</button>
     ${renderSrsForecast()}
