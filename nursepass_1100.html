@@ -210,6 +210,15 @@ body{min-height:100vh;background:linear-gradient(135deg,#F5EFE8 0%,#EDE0D0 50%,#
 /* ブックマーク */
 .bm-btn{background:none;border:none;cursor:pointer;font-size:18px;padding:4px 8px;border-radius:8px;transition:.15s;line-height:1}
 .bm-btn:hover{background:rgba(217,197,178,0.2)}
+.memo-btn{background:none;border:none;cursor:pointer;font-size:15px;padding:4px 6px;border-radius:8px;transition:.15s;line-height:1;color:#8A7060}
+.memo-btn:hover{background:rgba(217,197,178,0.2)}
+.memo-modal{position:fixed;inset:0;z-index:400;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,0.45);animation:fadein .2s ease}
+.memo-inner{background:#fff;border-radius:22px 22px 0 0;padding:20px 20px 32px;width:100%;max-width:480px;box-shadow:0 -4px 24px rgba(0,0,0,0.15)}
+.memo-title{font-size:14px;font-weight:700;color:#3C2A1E;margin-bottom:10px}
+.memo-textarea{width:100%;height:100px;border:1.5px solid rgba(217,197,178,.5);border-radius:12px;padding:10px;font-size:13px;font-family:'Noto Sans JP',sans-serif;color:#3C2A1E;resize:none;box-sizing:border-box;background:rgba(245,239,232,.6);outline:none}
+.memo-tag{display:inline-block;padding:2px 8px;background:rgba(217,197,178,.35);border-radius:10px;font-size:10px;color:#6B5040;margin-top:4px;font-weight:600}
+body.dark .memo-inner{background:rgba(35,28,24,.98);color:#D8C8B8}
+body.dark .memo-textarea{background:rgba(50,38,30,.8);color:#D8C8B8;border-color:rgba(180,160,140,.2)}
 /* アチーブメント */
 .badge-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px}
 .badge-item{text-align:center;padding:8px 4px;border-radius:12px;border:1.5px solid rgba(85,80,77,0.15)}
@@ -454,6 +463,45 @@ function toggleBookmark(id){
   if(btn) btn.textContent=bookmarks[id]?'🔖':'🤍';
   if(btn) btn.title=bookmarks[id]?'ブックマーク済み':'ブックマーク';
 }
+function openMemo(id){
+  const existing=document.getElementById('memoModal');
+  if(existing) existing.remove();
+  const q=QUESTIONS.find(x=>x.id===id);
+  const modal=document.createElement('div');
+  modal.id='memoModal';
+  modal.className='memo-modal';
+  modal.innerHTML=`<div class="memo-inner">
+    <div class="memo-title">📝 メモ — ${q?q.question.slice(0,30)+'…':''}</div>
+    <textarea class="memo-textarea" id="memoText" placeholder="解き方のコツ、覚え方、気になった点など...">${memoData[id]||''}</textarea>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button onclick="saveMemo(${id})" style="flex:2;padding:10px;background:linear-gradient(135deg,#D9C5B2,#B8A090);color:white;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif">保存</button>
+      ${memoData[id]?`<button onclick="deleteMemo(${id})" style="flex:1;padding:10px;background:rgba(248,113,113,0.1);color:#991b1b;border:1.5px solid rgba(248,113,113,0.3);border-radius:12px;font-size:13px;cursor:pointer;font-family:'Noto Sans JP',sans-serif">削除</button>`:''}
+      <button onclick="document.getElementById('memoModal').remove()" style="flex:1;padding:10px;background:rgba(237,224,212,.4);color:#5A5450;border:none;border-radius:12px;font-size:13px;cursor:pointer;font-family:'Noto Sans JP',sans-serif">閉じる</button>
+    </div>
+  </div>`;
+  modal.addEventListener('click',e=>{if(e.target===modal) modal.remove();});
+  document.body.appendChild(modal);
+  setTimeout(()=>document.getElementById('memoText').focus(),100);
+}
+function saveMemo(id){
+  const txt=document.getElementById('memoText').value.trim();
+  if(txt) memoData[id]=txt; else delete memoData[id];
+  localStorage.setItem('np_memos',JSON.stringify(memoData));
+  document.getElementById('memoModal').remove();
+  // ボタンアイコンを更新
+  const btn=document.getElementById('memoBtn'+id);
+  if(btn) btn.textContent=memoData[id]?'📝':'📋';
+  if(btn) btn.style.color=memoData[id]?'#D9A060':'#8A7060';
+  showToast('メモを保存しました');
+}
+function deleteMemo(id){
+  delete memoData[id];
+  localStorage.setItem('np_memos',JSON.stringify(memoData));
+  document.getElementById('memoModal').remove();
+  const btn=document.getElementById('memoBtn'+id);
+  if(btn){btn.textContent='📋';btn.style.color='#8A7060';}
+  showToast('メモを削除しました');
+}
 // ===== アチーブメント =====
 const ACHIEVEMENTS=[
   {id:'first',  icon:'🌱', name:'はじめの一歩', desc:'初めて問題を解く'},
@@ -476,6 +524,7 @@ const ACHIEVEMENTS=[
 let earnedBadges=JSON.parse(localStorage.getItem('np_badges')||'[]');
 let mockHistory=JSON.parse(localStorage.getItem('np_mock_history')||'[]');
 let flashProgress=JSON.parse(localStorage.getItem('np_flash_progress')||'{}');
+let memoData=JSON.parse(localStorage.getItem('np_memos')||'{}');
 // SRS: {id: {due:'YYYY-MM-DD', interval:1, easeFactor:2.5}}
 let srsData=JSON.parse(localStorage.getItem('np_srs')||'{}');
 // デイリーチャレンジ: {date:'YYYY-MM-DD', correct:0, total:0, done:false}
@@ -1358,11 +1407,18 @@ function answer(key){
   ];
   const nmsg=correct?msgs_ok[Math.floor(Math.random()*msgs_ok.length)]:msgs_ng[Math.floor(Math.random()*msgs_ng.length)];
   const isBm=!!bookmarks[q.id];
+  const hasMemo=!!memoData[q.id];
   res.innerHTML=`<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px">
     <div class="result-label">${correct?'✓ 正解！':'✗ 不正解'}</div>
-    <button class="bm-btn" id="bmBtn${q.id}" onclick="toggleBookmark(${q.id})" title="${isBm?'ブックマーク済み':'ブックマーク'}">${isBm?'🔖':'🤍'}</button>
+    <div style="display:flex;gap:2px">
+      <button class="memo-btn" id="memoBtn${q.id}" onclick="openMemo(${q.id})" title="メモ" style="color:${hasMemo?'#D9A060':'#8A7060'}">${hasMemo?'📝':'📋'}</button>
+      <button class="bm-btn" id="bmBtn${q.id}" onclick="toggleBookmark(${q.id})" title="${isBm?'ブックマーク済み':'ブックマーク'}">${isBm?'🔖':'🤍'}</button>
+    </div>
   </div>
-  <div style="font-size:12px;color:${correct?'#166534':'#B8A090'};font-weight:600;margin:4px 0 6px;padding:4px 8px;background:${correct?'rgba(74,222,128,0.08)':'rgba(217,197,178,0.08)'};border-radius:8px">${nmsg}</div><div class="explanation">${q.explanation}</div>`;
+  <div style="font-size:12px;color:${correct?'#166534':'#B8A090'};font-weight:600;margin:4px 0 6px;padding:4px 8px;background:${correct?'rgba(74,222,128,0.08)':'rgba(217,197,178,0.08)'};border-radius:8px">${nmsg}</div>
+  <div class="explanation">${q.explanation}</div>
+  ${hasMemo?`<div style="margin-top:8px;padding:8px 10px;background:rgba(217,185,80,0.1);border-left:3px solid #D9A060;border-radius:6px;font-size:12px;color:#5A4420">📝 <strong>マイメモ：</strong>${memoData[q.id]}</div>`:''}
+  `;
   choices.after(res);
   const mc=createMiniChat(q);
   res.after(mc);
@@ -1616,7 +1672,8 @@ function renderWeak(){
     weakIds=allWeak.filter(id=>{const q=QUESTIONS.find(x=>x.id==id);return q&&q.category===weakFilter;});
   }
   weakIds.sort((a,b)=>history[b].wrong-history[a].wrong);
-  if(sb) sb.innerHTML=allWeak.length?`苦手問題 <strong style="color:#B8907A">${allWeak.length}</strong>問 ／ 克服済み <strong style="color:#16a34a">${mastered}</strong>問 ／ 🔖${bmCount}問`:'';
+  const memoCount=Object.keys(memoData).length;
+  if(sb) sb.innerHTML=allWeak.length?`苦手問題 <strong style="color:#B8907A">${allWeak.length}</strong>問 ／ 克服済み <strong style="color:#16a34a">${mastered}</strong>問 ／ 🔖${bmCount}問${memoCount?` ／ 📝${memoCount}件`:''}`:'';
   if(wb) wb.style.display=weakIds.length?'block':'none';
   if(!weakIds.length){wl.innerHTML='<div class="empty">'+(weakFilter==='all'?'まだ苦手問題はないよ。<br>問題を解いてみよう！':`${weakFilter}の苦手問題はまだないよ。`)+'</div>';return;}
   wl.innerHTML=weakIds.slice(0,50).map(id=>{
@@ -1625,9 +1682,11 @@ function renderWeak(){
     const h=history[id];
     const isMastered=h.correct>h.wrong;
     const bm=bookmarks[id]?'🔖 ':'';
+    const memo=memoData[id]?`<div class="memo-tag">📝 ${memoData[id].slice(0,40)}${memoData[id].length>40?'…':''}</div>`:'';
     return `<div class="weak-item" onclick="drillOne(${q.id})" style="${isMastered?'border-color:rgba(74,222,128,0.35);background:rgba(74,222,128,0.06)':''}">
       <div class="weak-q">${bm}${q.question}</div>
       <div class="weak-meta">${q.category} ▸ ${q.field} ▸ 間違え${h.wrong}回 / 正解${h.correct}回 ${isMastered?'<span style="color:#16a34a;font-weight:700">✓ 克服</span>':''}</div>
+      ${memo}
     </div>`;
   }).join('');
 }
@@ -1861,7 +1920,7 @@ function renderStats(){
         </div>
       </div>`;
     })()}
-    <button onclick="if(confirm('記録をすべてリセットしますか？')){localStorage.removeItem('np_history');localStorage.removeItem('np_streak');localStorage.removeItem('np_weekly');localStorage.removeItem('np_badges');localStorage.removeItem('np_today_wrong');localStorage.removeItem('np_mock_history');localStorage.removeItem('np_flash_progress');localStorage.removeItem('np_srs');localStorage.removeItem('np_daily');history={};streakData={lastDate:'',streak:0};weeklyData={};earnedBadges=[];mockHistory=[];flashProgress={};srsData={};dailyChallenge=null;updateScoreBadge();renderStats();renderHomeSummary();}" style="margin-top:20px;background:none;border:none;color:#5A5450;font-size:11px;cursor:pointer;font-family:'Noto Sans JP',sans-serif">記録をリセット</button>`;
+    <button onclick="if(confirm('記録をすべてリセットしますか？')){localStorage.removeItem('np_history');localStorage.removeItem('np_streak');localStorage.removeItem('np_weekly');localStorage.removeItem('np_badges');localStorage.removeItem('np_today_wrong');localStorage.removeItem('np_mock_history');localStorage.removeItem('np_flash_progress');localStorage.removeItem('np_srs');localStorage.removeItem('np_daily');localStorage.removeItem('np_memos');history={};streakData={lastDate:'',streak:0};weeklyData={};earnedBadges=[];mockHistory=[];flashProgress={};srsData={};dailyChallenge=null;memoData={};updateScoreBadge();renderStats();renderHomeSummary();}" style="margin-top:20px;background:none;border:none;color:#5A5450;font-size:11px;cursor:pointer;font-family:'Noto Sans JP',sans-serif">記録をリセット</button>`;
 }
 
 
@@ -1920,9 +1979,10 @@ function ansJok(key){
   var ch2=document.getElementById('jokCh');
   var res=document.createElement('div');
   res.className='result-area '+(ok?'correct':'wrong');
-  var isBm2=!!bookmarks[q.id];
+  var isBm2=!!bookmarks[q.id];var hasMemo2=!!memoData[q.id];
   res.innerHTML='<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:6px"><div class="result-label">'+(ok?'✓ 正解！':'✗ 不正解')+'</div>'+
-    '<button class="bm-btn" id="bmBtn'+q.id+'" onclick="toggleBookmark('+q.id+')" title="'+(isBm2?'ブックマーク済み':'ブックマーク')+'">'+(isBm2?'🔖':'🤍')+'</button></div>'+
+    '<div style="display:flex;gap:2px"><button class="memo-btn" id="memoBtn'+q.id+'" onclick="openMemo('+q.id+')" title="メモ" style="color:'+(hasMemo2?'#D9A060':'#8A7060')+'">'+(hasMemo2?'📝':'📋')+'</button>'+
+    '<button class="bm-btn" id="bmBtn'+q.id+'" onclick="toggleBookmark('+q.id+')" title="'+(isBm2?'ブックマーク済み':'ブックマーク')+'">'+(isBm2?'🔖':'🤍')+'</button></div></div>'+
     '<div style="font-size:12px;font-weight:600;margin:4px 0 6px;padding:4px 8px;border-radius:8px;background:'+(ok?'rgba(74,222,128,0.08)':'rgba(217,197,178,0.08)')+';color:'+(ok?'#166534':'#B8A090')+'">'+nmsg+'</div>'+
     '<div class="explanation">'+q.explanation+'</div>';
   ch2.after(res);
