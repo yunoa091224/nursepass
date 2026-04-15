@@ -1455,7 +1455,7 @@ function autoAnswerTimeout(){
     res.className='result-area wrong';
     res.innerHTML='<div class="result-label">⏰ 時間切れ！</div><div class="explanation">'+q.explanation+'</div>';
     choices.after(res);
-    const nb=document.createElement('button');nb.className='next-btn';
+    const nb=document.createElement('button');nb.className='next-btn';nb.id='nextBtn';
     const isLast=session.idx>=session.pool.length-1;
     nb.textContent=isLast?'結果を見る →':'次の問題 →';
     nb.onclick=isLast?finishQuiz:nextQ;
@@ -1478,7 +1478,7 @@ function renderQuestion(){
         <div class="q-count">${isTime?'⏱ ':''}${session.idx+1}/${total}</div>
       </div>
       ${isTime?`<div class="timer-bar"><div class="timer-fill" id="timerFill" style="width:100%"></div></div><div class="timer-count" id="timerCnt">${session.timeLimit}秒</div>`:''}
-      <div class="q-field" style="display:flex;justify-content:space-between;align-items:center">${q.category} ▸ ${q.field}<span style="color:#D9C5B2;font-size:12px;letter-spacing:1px">${'★'.repeat(q.stars||1)+'☆'.repeat(3-(q.stars||1))}</span></div>
+      <div class="q-field" style="display:flex;justify-content:space-between;align-items:center">${q.category} ▸ ${q.field}<span style="display:flex;align-items:center;gap:8px"><span style="color:#C0B0A0;font-size:9px;letter-spacing:0">A/B/C/D キー</span><span style="color:#D9C5B2;font-size:12px;letter-spacing:1px">${'★'.repeat(q.stars||1)+'☆'.repeat(3-(q.stars||1))}</span></span></div>
       <div class="q-text">${q.question}</div>
       <div class="choices">
         ${Object.entries(q.choices).map(([k,v])=>`
@@ -1590,7 +1590,7 @@ function answer(key){
     mc.after(cc);
   } else {
     const nb=document.createElement('button');
-    nb.className='next-btn';
+    nb.className='next-btn';nb.id='nextBtn';
     nb.textContent=isLast?'結果を見る →':'次の問題 →';
     nb.onclick=isLast?finishQuiz:nextQ;
     mc.after(nb);
@@ -2950,6 +2950,35 @@ if(!localStorage.getItem('np_openai_key') && !localStorage.getItem('np_api_seen'
     if(el) el.textContent=n+'問';
   });
 })();
+// キーボードショートカット
+document.addEventListener('keydown', function(e){
+  // 入力フィールドにいる場合は無視
+  const tag=e.target.tagName;
+  if(tag==='INPUT'||tag==='TEXTAREA') return;
+  // クイズ画面が表示中のみ有効
+  const qa=document.getElementById('quizArea');
+  if(!qa||qa.style.display==='none') return;
+  if(!session||!session.pool) return;
+  const key=e.key.toUpperCase();
+  // 選択肢ボタンが有効かチェック（未回答時）
+  const chA=document.getElementById('chA');
+  const answered=chA&&chA.disabled;
+  if(!answered){
+    // A/B/C/D または 1/2/3/4 で選択
+    const map={'1':'A','2':'B','3':'C','4':'D','A':'A','B':'B','C':'C','D':'D'};
+    if(map[key]){
+      const btn=document.getElementById('ch'+map[key]);
+      if(btn&&!btn.disabled){e.preventDefault();answer(map[key]);}
+    }
+  } else {
+    // 回答後: Enter/Space/→ で次の問題
+    if(key==='ENTER'||key===' '||key==='ARROWRIGHT'){
+      e.preventDefault();
+      const nextBtn=document.getElementById('nextBtn');
+      if(nextBtn) nextBtn.click();
+    }
+  }
+});
 initChips();
 initModeButtons();
 updateScoreBadge();
