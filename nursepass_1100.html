@@ -3245,6 +3245,38 @@ async function requestNoaAnalysis(){
   }
   btn.disabled=false;btn.textContent='🌸 のあ先生に分析してもらう';
 }
+// 模擬試験履歴グラフ
+function renderMockHistoryChart(){
+  if(!mockHistory||mockHistory.length<2) return '';
+  const recent=mockHistory.slice(0,10).reverse();
+  const maxR=100;
+  const bars=recent.map((r,i)=>{
+    const h=Math.round((r.rate/100)*52);
+    const col=r.pass?'rgba(74,222,128,0.8)':'rgba(248,113,113,0.7)';
+    const border=r.pass?'#16a34a':'#dc2626';
+    return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:1px" title="${r.date}: ${r.rate}% ${r.pass?'合格':'不合格'}">
+      <div style="font-size:8px;color:#8A7060;font-variant-numeric:tabular-nums">${r.rate}</div>
+      <div style="width:14px;height:${h}px;background:${col};border-radius:3px 3px 0 0;min-height:2px"></div>
+      <div style="font-size:8px;color:#aaa">${r.date.slice(5)}</div>
+    </div>`;
+  });
+  const avg=Math.round(recent.reduce((s,r)=>s+r.rate,0)/recent.length);
+  return `<div style="margin-bottom:14px;padding:12px 14px;background:linear-gradient(135deg,rgba(245,239,232,0.9),rgba(235,225,210,0.85));border:1.5px solid rgba(217,197,178,0.4);border-radius:14px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <div style="font-size:11px;font-weight:700;color:#B8907A">📝 模擬試験スコア推移</div>
+      <div style="font-size:10px;color:#8A6A50">平均: <strong style="color:#B8907A">${avg}%</strong> | ${mockHistory.length}回</div>
+    </div>
+    <div style="position:relative;height:70px;display:flex;align-items:flex-end;gap:2px;padding-bottom:12px">
+      <div style="position:absolute;bottom:${12+Math.round(80/100*52)}px;left:0;right:0;border-top:1px dashed rgba(239,68,68,0.4)"></div>
+      <div style="position:absolute;bottom:${12+Math.round(80/100*52)}px;right:2px;font-size:8px;color:rgba(239,68,68,0.7)">80%</div>
+      ${bars.join('')}
+    </div>
+    <div style="display:flex;gap:8px;font-size:9px;color:#8A7060">
+      <span><span style="display:inline-block;width:8px;height:8px;background:rgba(74,222,128,0.8);border-radius:2px;margin-right:3px;vertical-align:middle"></span>合格</span>
+      <span><span style="display:inline-block;width:8px;height:8px;background:rgba(248,113,113,0.7);border-radius:2px;margin-right:3px;vertical-align:middle"></span>不合格</span>
+    </div>
+  </div>`;
+}
 // 分野別強弱ランキング
 function renderFieldRanking(){
   const fieldStats={};
@@ -3933,6 +3965,7 @@ function renderStats(){
       <div id="noaAnalysisOutput" style="display:none;margin-top:8px;padding:12px 14px;background:linear-gradient(135deg,rgba(245,239,232,0.9),rgba(237,224,212,0.85));border:1.5px solid rgba(217,197,178,0.4);border-radius:12px"></div>
     </div>
     <button onclick="if(confirm('記録をすべてリセットしますか？')){localStorage.removeItem('np_history');localStorage.removeItem('np_streak');localStorage.removeItem('np_weekly');localStorage.removeItem('np_badges');localStorage.removeItem('np_today_wrong');localStorage.removeItem('np_mock_history');localStorage.removeItem('np_flash_progress');localStorage.removeItem('np_srs');localStorage.removeItem('np_daily');localStorage.removeItem('np_memos');localStorage.removeItem('np_best');localStorage.removeItem('np_daily_acc');localStorage.removeItem('np_wrong_choices');history={};streakData={lastDate:'',streak:0};weeklyData={};earnedBadges=[];mockHistory=[];flashProgress={};srsData={};dailyChallenge=null;memoData={};bestScores={};dailyAccuracy={};wrongChoices={};updateScoreBadge();renderStats();renderHomeSummary();}" style="margin-top:12px;background:none;border:none;color:#5A5450;font-size:11px;cursor:pointer;font-family:'Noto Sans JP',sans-serif">記録をリセット</button>
+    ${renderMockHistoryChart()}
     ${renderSrsForecast()}
     ${renderPaceAnalysis()}
     ${renderTopMissed()}
@@ -4837,6 +4870,28 @@ renderGoalBar();renderNoaCard();renderDailyBanner();
 showResumeBanner();
 initPomodoro();
 renderTodayPlan();
+// おかえり通知（前回学習から24h以上経過）
+(function showWelcomeBack(){
+  const lastStudyDate=Object.keys(weeklyData).filter(d=>weeklyData[d]>0).sort().pop();
+  if(!lastStudyDate) return;
+  const today=new Date(todayKey);
+  const last=new Date(lastStudyDate);
+  const diffDays=Math.round((today-last)/(1000*60*60*24));
+  if(diffDays<2) return; // 昨日以降は表示しない
+  const streak=streakData.streak||0;
+  const msgs=[
+    `${diffDays}日ぶりだね。待ってたよ🌸`,
+    `おかえり！${diffDays}日ぶりの勉強だね。一緒に頑張ろう✨`,
+    `久しぶりだね。今日また一歩進もう🌟`
+  ];
+  const msg=msgs[Math.floor(Math.random()*msgs.length)];
+  const el=document.createElement('div');
+  el.style.cssText='position:fixed;top:60px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,rgba(245,239,232,0.97),rgba(237,224,212,0.95));border:1.5px solid rgba(217,197,178,0.6);border-radius:16px;padding:12px 18px;font-size:13px;color:#4A3828;font-family:"Noto Sans JP",sans-serif;font-weight:600;text-align:center;z-index:9000;box-shadow:0 4px 20px rgba(184,144,122,0.25);max-width:280px;cursor:pointer;animation:fadein .4s ease';
+  el.innerHTML=`<div style="font-size:11px;color:#B8907A;margin-bottom:4px">🌸 のあ先生より</div>${msg}`;
+  el.onclick=()=>el.remove();
+  document.body.appendChild(el);
+  setTimeout(()=>el.remove(),5000);
+})();
 </script>
 </body>
 </html>
