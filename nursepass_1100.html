@@ -361,6 +361,7 @@ body.font-xl .explanation{font-size:15px}
     <div id="todayPlanCard" style="margin-bottom:10px"></div>
     <div id="questionOfDayCard" style="margin-bottom:10px"></div>
     <div id="miniReviewCard" style="margin-bottom:10px"></div>
+    <div id="todayTimelineCard" style="margin-bottom:10px"></div>
     <div class="search-wrap">
       <span style="font-size:16px;color:#aaa">🔍</span>
       <input class="search-input" id="searchInput" placeholder="キーワード検索 / #123でID直接検索" oninput="onSearchInput(this.value)" autocomplete="off">
@@ -800,6 +801,25 @@ function flagQuestion(id){
     showToast('難問フラグを設定。明日SRS復習に追加されます');
   }
   localStorage.setItem('np_flags',JSON.stringify([...flaggedIds]));
+}
+function setConfidence(id,level){
+  const bar=document.getElementById('confBar_'+id);
+  if(!bar) return;
+  if(level==='sure'){
+    // 確信あり → SRS間隔を1日伸ばす
+    if(srsData[id]){srsData[id].interval=Math.min(srsData[id].interval+1,60);const d=new Date(todayKey);d.setDate(d.getDate()+srsData[id].interval);srsData[id].due=d.toISOString().slice(0,10);localStorage.setItem('np_srs',JSON.stringify(srsData));}
+    bar.innerHTML='<span style="font-size:11px;color:#16a34a;font-weight:700">✓ 確信あり — 次回SRS間隔を延長しました</span>';
+    showToast('✓ 完璧！SRS間隔を延長しました');
+  } else {
+    // 曖昧 → SRS間隔を短縮して早めに復習
+    const s=srsData[id]||{interval:1,easeFactor:2.5,due:todayKey};
+    const shortInterval=Math.max(1,Math.ceil(s.interval/2));
+    const d=new Date(todayKey);d.setDate(d.getDate()+shortInterval);
+    srsData[id]={interval:shortInterval,easeFactor:Math.max(1.3,s.easeFactor-0.1),due:d.toISOString().slice(0,10)};
+    localStorage.setItem('np_srs',JSON.stringify(srsData));
+    bar.innerHTML=`<span style="font-size:11px;color:#b45309;font-weight:700">△ 曖昧 — ${shortInterval}日後にSRS復習予定</span>`;
+    showToast('△ 曖昧ならOK！早めに復習します');
+  }
 }
 function checkAchievements(){
   const answered=Object.values(history).reduce((s,h)=>s+h.correct+h.wrong,0);
@@ -1262,6 +1282,33 @@ function answerMiniReview(key,qid){
   el.querySelector('div').appendChild(resDiv);
   el.dataset.answered='1';
   haptic(correct);playAnswerSound(correct);
+}
+function renderTodayTimeline(){
+  const el=document.getElementById('todayTimelineCard');
+  if(!el) return;
+  const todaySessions=sessionLog.filter(s=>s.date===todayKey);
+  if(todaySessions.length<2){el.innerHTML='';return;}
+  const modeLabel={random:'ランダム',field:'分野別',weak:'苦手強化',hisshu:'必修',ippan50:'一般',timeatk:'⏱',mock:'模擬',daily:'デイリー',srs:'SRS',allcat:'100問',drill:'1問',lastmin:'直前',flagged:'難問',streak10:'10連続',minimock:'ミニ模擬',adaptive:'アダプティブ'};
+  const totalToday=todaySessions.reduce((s,x)=>s+x.total,0);
+  const correctToday=todaySessions.reduce((s,x)=>s+x.correct,0);
+  const avgRate=Math.round(correctToday/totalToday*100);
+  el.innerHTML=`<div style="padding:10px 14px;background:rgba(240,232,222,0.55);border:1.5px solid rgba(217,197,178,0.35);border-radius:14px">
+    <div style="font-size:10px;font-weight:700;color:#B8907A;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
+      <span>📝 今日の学習記録（${todaySessions.length}セッション）</span>
+      <span style="color:${avgRate>=80?'#16a34a':avgRate>=60?'#D9A060':'#ef4444'};font-weight:700">${avgRate}% 平均</span>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:4px">
+      ${todaySessions.map((s,i)=>{
+        const col=s.rate>=80?'#16a34a':s.rate>=60?'#D9A060':'#ef4444';
+        const bar=Math.round(s.rate);
+        return `<div style="display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center">
+          <span style="font-size:9px;color:#A09080;white-space:nowrap">${i+1}回目</span>
+          <div><div style="font-size:10px;color:#6B5040;margin-bottom:2px">${modeLabel[s.mode]||s.mode} ${s.total}問${s.combo>=3?` 🔥${s.combo}`:''}</div><div style="height:4px;background:rgba(237,224,212,0.4);border-radius:4px;overflow:hidden"><div style="width:${bar}%;height:100%;background:${col};border-radius:4px"></div></div></div>
+          <span style="font-size:12px;font-weight:700;color:${col};white-space:nowrap">${s.rate}%</span>
+        </div>`;
+      }).join('')}
+    </div>
+  </div>`;
 }
 function renderNoaCard(){
   const el=document.getElementById('noaCard');
@@ -2107,7 +2154,7 @@ function switchTab(t){
   if(t==='noa') initChat();
   document.getElementById('quizArea').style.display='none';
   // Refresh home widgets when returning
-  if(t==='home'){showResumeBanner();renderTodayPlan();}
+  if(t==='home'){showResumeBanner();renderTodayPlan();renderTodayTimeline();renderMiniReview();}
 }
 
 // CATEGORY SELECT
@@ -2982,10 +3029,23 @@ function answer(key){
     if(milestones.includes(session.combo)) setTimeout(()=>{showToast(`🔥 ${session.combo}連続正解！コンボ継続中！`);if(session.combo>=5)launchConfetti();},100);
   } else {
     session.combo=0;
+    session.wrongStreak=(session.wrongStreak||0)+1;
     session.wrong++;
     if(!session.wrongIds)session.wrongIds=[];
     if(!session.wrongIds.includes(q.id))session.wrongIds.push(q.id);
+    // 連続誤答アラート
+    if(session.wrongStreak===3){
+      const msgs=['大丈夫、間違えることで記憶に残るよ。解説をしっかり読んで次へ進もう。','難しい問題が続いているね。焦らずゆっくり考えて。のあが応援してるよ🌸','少し立ち止まって。苦手に絞るモードに切り替えると効率がいいかも。'];
+      setTimeout(()=>{
+        const toast=document.createElement('div');
+        toast.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,rgba(245,239,232,0.97),rgba(237,224,212,0.95));border:1.5px solid rgba(217,197,178,0.6);border-radius:16px;padding:12px 16px;font-size:12px;color:#4A3828;font-family:"Noto Sans JP",sans-serif;text-align:center;z-index:9000;box-shadow:0 4px 20px rgba(184,144,122,0.25);max-width:280px;width:90%';
+        toast.innerHTML=`<div style="font-size:10px;font-weight:700;color:#B8907A;margin-bottom:5px">🌸 のあ先生</div><div style="font-size:11px;line-height:1.5">${msgs[Math.floor(Math.random()*msgs.length)]}</div><div style="display:flex;gap:6px;margin-top:8px"><button onclick="this.closest('div[style]').remove();startWeakFromHere()" style="flex:1;padding:5px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:8px;font-size:10px;color:#dc2626;cursor:pointer;font-family:'Noto Sans JP',sans-serif">苦手に絞る</button><button onclick="this.closest('div[style]').remove()" style="flex:1;padding:5px;background:rgba(240,232,222,0.8);border:1px solid rgba(85,80,77,0.2);border-radius:8px;font-size:10px;color:#6B5040;cursor:pointer;font-family:'Noto Sans JP',sans-serif">続ける</button></div>`;
+        document.body.appendChild(toast);
+        setTimeout(()=>{if(toast.parentNode)toast.remove();},8000);
+      },600);
+    }
   }
+  if(session.wrongStreak&&correct) session.wrongStreak=0;
   if(session.mode==='daily'&&dailyChallenge){dailyChallenge.correct=session.correct;dailyChallenge.total=session.correct+session.wrong;}
   // streak10: track current streak, end immediately on wrong answer
   if(session.mode==='streak10'){
@@ -3063,6 +3123,7 @@ function answer(key){
       ${rel.map(r=>{const rh=history[String(r.id)];const rLabel=rh&&rh.wrong>0?`<span style="color:#dc2626;font-size:9px">✗${rh.wrong}回</span>`:`<span style="color:#aaa;font-size:9px">未解答</span>`;return `<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-top:1px solid rgba(85,80,77,0.08)"><span style="flex:1;font-size:11px;color:#55504D;cursor:pointer" onclick="drillOne(${r.id})">${r.question.slice(0,40)}…</span>${rLabel}</div>`;}).join('')}
     </div>`;
   })()}
+  ${correct?`<div id="confBar_${q.id}" style="margin-top:8px;padding:7px 10px;background:rgba(240,232,222,0.4);border-radius:10px;display:flex;gap:6px;align-items:center"><span style="font-size:10px;color:#8A6A50;white-space:nowrap">確信度：</span><button onclick="setConfidence(${q.id},'sure')" id="confSure_${q.id}" style="flex:1;padding:5px 8px;background:rgba(74,222,128,0.15);border:1.5px solid rgba(74,222,128,0.4);border-radius:10px;font-size:11px;font-weight:700;color:#16a34a;cursor:pointer;font-family:'Noto Sans JP',sans-serif">✓ 完璧</button><button onclick="setConfidence(${q.id},'unsure')" id="confUnsure_${q.id}" style="flex:1;padding:5px 8px;background:rgba(251,191,36,0.12);border:1.5px solid rgba(251,191,36,0.4);border-radius:10px;font-size:11px;font-weight:700;color:#b45309;cursor:pointer;font-family:'Noto Sans JP',sans-serif">△ 曖昧</button></div>`:''}
   <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
     ${window.speechSynthesis?`<button class="tts-btn" onclick="speakText('${(q.question+' 正解は'+q.choices[q.answer]+' 解説: '+q.explanation).replace(/'/g,'&apos;')}')">🔊 読み上げ</button>${renderTtsSpeedBtns()}`:''}
     <button id="flagBtn_${q.id}" onclick="flagQuestion(${q.id})" style="padding:5px 10px;background:${flaggedIds.has(q.id)?'rgba(239,68,68,0.12)':'rgba(240,232,222,0.8)'};color:${flaggedIds.has(q.id)?'#dc2626':'#8A6A50'};border:1px solid rgba(85,80,77,0.2);border-radius:16px;font-size:11px;cursor:pointer;font-family:'Noto Sans JP',sans-serif">${flaggedIds.has(q.id)?'🔖 フラグ済み':'🤔 難しかった'}</button>
@@ -5879,7 +5940,7 @@ updateScoreBadge();
 initDailyMessage();
 renderHomeSummary();
 renderExamCountdown();
-renderGoalBar();renderNoaCard();renderDailyTip();renderDailyBanner();updateSoundBtn();renderSessionGoalBar();renderMiniReview();
+renderGoalBar();renderNoaCard();renderDailyTip();renderDailyBanner();updateSoundBtn();renderSessionGoalBar();renderMiniReview();renderTodayTimeline();
 showResumeBanner();
 initPomodoro();
 renderTodayPlan();
