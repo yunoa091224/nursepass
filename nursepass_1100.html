@@ -764,7 +764,7 @@ function saveBestScore(mode, rate, correct, total){
   localStorage.setItem('np_daily_acc',JSON.stringify(dailyAccuracy));
 }
 function getModeLabel(mode){
-  return{random:'ランダム',field:'分野別',weak:'苦手強化',hisshu:'必修50問',ippan50:'一般50問',timeatk:'タイムアタック',mock:'模擬試験',daily:'デイリー',srs:'SRS復習',allcat:'100問一気',drill:'1問解説',lastmin:'試験直前'}[mode]||mode;
+  return{random:'ランダム',field:'分野別',weak:'苦手強化',hisshu:'必修50問',ippan50:'一般50問',timeatk:'タイムアタック',mock:'模擬試験',daily:'デイリー',srs:'SRS復習',allcat:'100問一気',drill:'1問解説',lastmin:'試験直前',flagged:'難問特訓'}[mode]||mode;
 }
 // 今日の間違い・1日目標
 let todayWrong = JSON.parse(localStorage.getItem('np_today_wrong')||'{"date":"","ids":[]}');
@@ -1071,6 +1071,10 @@ function updateScoreBadge(){
 
 // TABS
 function switchTab(t){
+  // Save in-progress quiz before navigating away
+  if(session&&session.pool&&session.pool.length>0&&session.idx<session.pool.length){
+    saveSessionSnapshot();
+  }
   document.getElementById('tabHome').style.display=t==='home'?'block':'none';
   document.getElementById('tabWeak').style.display=t==='weak'?'block':'none';
   document.getElementById('tabStats').style.display=t==='stats'?'block':'none';
@@ -1082,6 +1086,8 @@ function switchTab(t){
   if(t==='stats') renderStats();
   if(t==='noa') initChat();
   document.getElementById('quizArea').style.display='none';
+  // Show resume banner if a valid snapshot exists and quiz isn't active
+  if(t==='home'){showResumeBanner();}
 }
 
 // CATEGORY SELECT
@@ -1380,6 +1386,7 @@ function initModeButtons(){
       <button class="mode-btn" onclick="startQuiz('allcat')"><div class="mode-icon">🏃</div><div class="mode-title">100問一気</div><div class="mode-desc">本番形式</div></button>
       <button class="mode-btn" onclick="startQuiz('hisshu')" style="border-color:rgba(217,197,178,0.5);background:rgba(237,224,212,0.9);grid-column:1/-1"><div class="mode-icon">⭐</div><div class="mode-title">必修50問 本番形式</div><div class="mode-desc">合格ライン80%（40/50問）で合否判定</div></button>
       <button class="mode-btn" onclick="startQuiz('lastmin')" style="border-color:rgba(239,68,68,0.4);background:linear-gradient(135deg,rgba(254,226,226,0.9),rgba(255,215,215,0.85));grid-column:1/-1"><div class="mode-icon">🚨</div><div class="mode-title">試験直前モード</div><div class="mode-desc">未克服の頻出問題＋SRS期限問題を最大30問</div></button>
+      ${flaggedIds.size>0?`<button class="mode-btn" onclick="startQuiz('flagged')" style="border-color:rgba(239,68,68,0.3);background:linear-gradient(135deg,rgba(255,237,213,0.9),rgba(254,215,170,0.85));grid-column:1/-1"><div class="mode-icon">🔖</div><div class="mode-title">難問特訓（${flaggedIds.size}問）</div><div class="mode-desc">フラグを付けた難しかった問題だけ</div></button>`:''}
       <button class="mode-btn" onclick="showFlashCards()" style="border-color:rgba(184,160,144,0.5);background:linear-gradient(135deg,rgba(245,239,232,0.95),rgba(237,224,212,0.9));grid-column:1/-1"><div class="mode-icon">🃏</div><div class="mode-title">暗記カード</div><div class="mode-desc">検査値・薬物・看護技術など76枚</div></button>
       <button class="cal-home-btn" onclick="showCalModal()">📅 学習予定をGoogleカレンダーに追加</button>`;
   }
@@ -1395,6 +1402,7 @@ function initModeButtons(){
       <button class="mode-btn" onclick="startQuiz('allcat')"><div class="mode-icon">🏃</div><div class="mode-title">100問一気</div><div class="mode-desc">本番形式</div></button>
       <button class="mode-btn" onclick="startQuiz('ippan50')" style="border-color:rgba(217,197,178,0.5);background:rgba(237,224,212,0.9);grid-column:1/-1"><div class="mode-icon">📚</div><div class="mode-title">一般問題 50問演習</div><div class="mode-desc">11分野からバランスよく出題</div></button>
       <button class="mode-btn" onclick="startQuiz('lastmin')" style="border-color:rgba(239,68,68,0.4);background:linear-gradient(135deg,rgba(254,226,226,0.9),rgba(255,215,215,0.85));grid-column:1/-1"><div class="mode-icon">🚨</div><div class="mode-title">試験直前モード</div><div class="mode-desc">未克服の頻出問題＋SRS期限問題を最大30問</div></button>
+      ${flaggedIds.size>0?`<button class="mode-btn" onclick="startQuiz('flagged')" style="border-color:rgba(239,68,68,0.3);background:linear-gradient(135deg,rgba(255,237,213,0.9),rgba(254,215,170,0.85));grid-column:1/-1"><div class="mode-icon">🔖</div><div class="mode-title">難問特訓（${flaggedIds.size}問）</div><div class="mode-desc">フラグを付けた難しかった問題だけ</div></button>`:''}
       <button class="mode-btn" onclick="showFlashCards()" style="border-color:rgba(184,160,144,0.5);background:linear-gradient(135deg,rgba(245,239,232,0.95),rgba(237,224,212,0.9));grid-column:1/-1"><div class="mode-icon">🃏</div><div class="mode-title">暗記カード</div><div class="mode-desc">検査値・薬物・看護技術など76枚</div></button>
       <button class="cal-home-btn" onclick="showCalModal()">📅 学習予定をGoogleカレンダーに追加</button>`;
   }
@@ -1410,6 +1418,7 @@ function initModeButtons(){
       <button class="mode-btn" onclick="startQuiz('allcat')"><div class="mode-icon">🏃</div><div class="mode-title">全問一気</div><div class="mode-desc">本番形式</div></button>
       <button class="mode-btn" onclick="startJokyoMode()" style="border-color:rgba(5,150,105,0.5);background:rgba(230,255,245,0.9);grid-column:1/-1"><div class="mode-icon">📋</div><div class="mode-title">状況設定 専用モード</div><div class="mode-desc">事例を1問ずつ、丁寧に解く</div></button>
       <button class="mode-btn" onclick="startQuiz('lastmin')" style="border-color:rgba(239,68,68,0.4);background:linear-gradient(135deg,rgba(254,226,226,0.9),rgba(255,215,215,0.85));grid-column:1/-1"><div class="mode-icon">🚨</div><div class="mode-title">試験直前モード</div><div class="mode-desc">未克服の頻出問題＋SRS期限問題を最大30問</div></button>
+      ${flaggedIds.size>0?`<button class="mode-btn" onclick="startQuiz('flagged')" style="border-color:rgba(239,68,68,0.3);background:linear-gradient(135deg,rgba(255,237,213,0.9),rgba(254,215,170,0.85));grid-column:1/-1"><div class="mode-icon">🔖</div><div class="mode-title">難問特訓（${flaggedIds.size}問）</div><div class="mode-desc">フラグを付けた難しかった問題だけ</div></button>`:''}
       <button class="mode-btn" onclick="showFlashCards()" style="border-color:rgba(184,160,144,0.5);background:linear-gradient(135deg,rgba(245,239,232,0.95),rgba(237,224,212,0.9));grid-column:1/-1"><div class="mode-icon">🃏</div><div class="mode-title">暗記カード</div><div class="mode-desc">検査値・薬物・看護技術など76枚</div></button>
       <button class="cal-home-btn" onclick="showCalModal()">📅 学習予定をGoogleカレンダーに追加</button>`;
   }
@@ -1492,6 +1501,14 @@ function startQuiz(mode){
     showQuiz();
     return;
   }
+  else if(mode==='flagged'){
+    // 難問特訓: フラグ付き問題のみ
+    pool=shuffle(QUESTIONS.filter(q=>flaggedIds.has(q.id)));
+    if(!pool.length){alert('難問フラグが設定された問題がありません。\n解答後に「🤔 難しかった」ボタンでフラグを付けましょう。');return;}
+    session={pool,idx:0,correct:0,wrong:0,mode:'flagged'};
+    showQuiz();
+    return;
+  }
   if(!pool.length){alert('選択した分野に問題がありません。');return;}
   session={pool,idx:0,correct:0,wrong:0,mode};
   showQuiz();
@@ -1518,6 +1535,51 @@ function startPractice(spec){
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 
 let sessionStartTime=0;
+function saveSessionSnapshot(){
+  if(!session||!session.pool||session.pool.length===0) return;
+  // Don't save timed or mock sessions
+  if(session.mode==='timeatk'||session.mode==='mock') return;
+  const snap={
+    mode:session.mode,
+    idx:session.idx,
+    correct:session.correct,
+    wrong:session.wrong,
+    wrongIds:session.wrongIds||[],
+    poolIds:session.pool.map(q=>q.id),
+    savedAt:Date.now()
+  };
+  localStorage.setItem('np_session_snap',JSON.stringify(snap));
+}
+function clearSessionSnapshot(){localStorage.removeItem('np_session_snap');}
+function showResumeBanner(){
+  const existing=document.getElementById('resumeBanner');
+  if(existing) existing.remove();
+  const snap=JSON.parse(localStorage.getItem('np_session_snap')||'null');
+  if(!snap) return;
+  // Expire after 24h
+  if(Date.now()-snap.savedAt>86400000){clearSessionSnapshot();return;}
+  const pool=snap.poolIds.map(id=>QUESTIONS.find(q=>q.id===id)).filter(Boolean);
+  if(!pool.length){clearSessionSnapshot();return;}
+  const remaining=pool.length-snap.idx;
+  if(remaining<=0){clearSessionSnapshot();return;}
+  const label=getModeLabel(snap.mode);
+  const banner=document.createElement('div');
+  banner.id='resumeBanner';
+  banner.style.cssText='margin:0 0 12px;padding:12px 14px;background:linear-gradient(135deg,rgba(240,232,222,0.95),rgba(230,218,208,0.9));border:1.5px solid rgba(184,160,144,0.5);border-radius:14px;display:flex;align-items:center;justify-content:space-between;gap:10px';
+  banner.innerHTML=`<div style="flex:1"><div style="font-size:12px;font-weight:700;color:#6B5040">📌 前回の続きがあります</div><div style="font-size:11px;color:#8A6A50;margin-top:2px">${label} — 残り${remaining}問 (${snap.idx}/${pool.length}問済み)</div></div><div style="display:flex;gap:6px"><button onclick="resumeSession()" style="padding:6px 12px;background:#8A6A50;color:white;border:none;border-radius:10px;font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif">再開</button><button onclick="clearSessionSnapshot();document.getElementById('resumeBanner').remove()" style="padding:6px 10px;background:rgba(85,80,77,0.1);color:#8A6A50;border:1px solid rgba(85,80,77,0.2);border-radius:10px;font-size:11px;cursor:pointer;font-family:'Noto Sans JP',sans-serif">削除</button></div>`;
+  const mg=document.getElementById('modeGrid');
+  if(mg&&mg.parentNode) mg.parentNode.insertBefore(banner,mg);
+}
+function resumeSession(){
+  const snap=JSON.parse(localStorage.getItem('np_session_snap')||'null');
+  if(!snap) return;
+  const pool=snap.poolIds.map(id=>QUESTIONS.find(q=>q.id===id)).filter(Boolean);
+  if(!pool.length){clearSessionSnapshot();return;}
+  session={pool,idx:snap.idx,correct:snap.correct,wrong:snap.wrong,wrongIds:snap.wrongIds||[],mode:snap.mode};
+  clearSessionSnapshot();
+  document.getElementById('resumeBanner')?.remove();
+  showQuiz();
+}
 function showQuiz(){
   sessionStartTime=Date.now();
   document.getElementById('tabHome').style.display='none';
@@ -1754,6 +1816,7 @@ function startWeakFromHere(){
 function nextQ(){clearQuizTimer();session.idx++;renderQuestion();}
 
 function finishQuiz(){
+  clearSessionSnapshot();
   const qa=document.getElementById('quizArea');
   const total=session.correct+session.wrong;
   const rate=Math.round(session.correct/total*100);
@@ -2214,6 +2277,46 @@ function renderStats(){
     </div>`:''}
   </div>`;
   const coverPct2=Math.round(total/QUESTIONS.length*100);
+  // 正答率トレンドグラフ（週別・過去8週）
+  const accTrendChart=(()=>{
+    const weeks=[];
+    for(let w=7;w>=0;w--){
+      let wkC=0,wkT=0;
+      for(let d=0;d<7;d++){
+        const date=new Date();date.setDate(date.getDate()-(w*7+d));
+        const k=date.toISOString().slice(0,10);
+        const da=dailyAccuracy[k]||{};
+        wkC+=(da.correct||0);wkT+=(da.total||0);
+      }
+      const wkEnd=new Date();wkEnd.setDate(wkEnd.getDate()-w*7);
+      const label=`${wkEnd.getMonth()+1}/${wkEnd.getDate()}`;
+      weeks.push({label,acc:wkT>=5?Math.round(wkC/wkT*100):null,total:wkT});
+    }
+    const hasData=weeks.some(w=>w.acc!==null);
+    if(!hasData) return '';
+    const W=280,H=80,padL=28,padR=8,padT=8,padB=20;
+    const iW=W-padL-padR,iH=H-padT-padB;
+    const pts=weeks.map((w,i)=>({x:padL+i*(iW/7),y:w.acc!==null?padT+iH*(1-w.acc/100):null,acc:w.acc,label:w.label,total:w.total}));
+    const validPts=pts.filter(p=>p.y!==null);
+    if(validPts.length<2) return '';
+    // Grid lines at 60,80,100%
+    const grids=[60,80,100].map(pct=>{
+      const y=padT+iH*(1-pct/100);
+      return `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="rgba(85,80,77,0.1)" stroke-width="0.8"/><text x="${padL-3}" y="${y+3}" text-anchor="end" font-size="7" fill="#8A6A50">${pct}</text>`;
+    }).join('');
+    // Polyline
+    const linePts=validPts.map(p=>`${p.x},${p.y}`).join(' ');
+    // X labels
+    const xLabels=pts.map((p,i)=>i%2===0?`<text x="${p.x}" y="${H-4}" text-anchor="middle" font-size="7" fill="#8A6A50">${p.label}</text>`:'').join('');
+    // Dots
+    const dots=validPts.map(p=>`<circle cx="${p.x}" cy="${p.y}" r="2.5" fill="${p.acc>=80?'#16a34a':p.acc>=60?'#D9A060':'#ef4444'}" title="${p.acc}%"/>`).join('');
+    return `<div style="text-align:left;margin-top:12px">
+      <div class="cat-stat-header">▸ 正答率トレンド（週別・過去8週）</div>
+      <div style="margin-top:8px;overflow-x:auto">
+        <svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:${W}px">${grids}<polyline points="${linePts}" fill="none" stroke="rgba(184,144,122,0.7)" stroke-width="1.5" stroke-linejoin="round"/>${dots}${xLabels}</svg>
+      </div>
+    </div>`;
+  })();
 
   // 学習分析レポート
   const analysisHtml=(()=>{
@@ -2286,6 +2389,7 @@ function renderStats(){
     <div class="result-label2">解答${answered}問 / 学習済み${total}問（カバー率${coverPct2}%）</div>
     <div style="display:flex;gap:8px;margin-top:12px">${catHtml}</div>
     ${weekChart}
+    ${accTrendChart}
     ${(()=>{
       // レーダーチャート: 8大分野の正答率
       const radarGroups=[
@@ -3394,6 +3498,7 @@ initDailyMessage();
 renderHomeSummary();
 renderExamCountdown();
 renderGoalBar();renderNoaCard();renderDailyBanner();
+showResumeBanner();
 </script>
 </body>
 </html>
