@@ -1481,12 +1481,21 @@ function buildMonthCalendar(){
   function col(cnt){if(!cnt)return'rgba(237,224,212,0.25)';const r=cnt/max;return r<0.25?'rgba(217,197,178,0.5)':r<0.5?'rgba(184,160,144,0.7)':r<0.75?'rgba(150,120,96,0.85)':'#8A6050';}
   const dayLabels=['日','月','火','水','木','金','土'];
   const label=`${year}年${month+1}月`;
+  // Build streak day set (consecutive days ending today)
+  const streakDays=new Set();
+  let sd=new Date(todayKey);
+  for(let i=0;i<(streakData.streak||0);i++){
+    streakDays.add(sd.toISOString().slice(0,10));
+    sd.setDate(sd.getDate()-1);
+  }
   const cells=allDays.map(k=>{
     if(!k) return `<div></div>`;
     const cnt=weeklyData[k]||0;
     const isToday=k===todayKey;
+    const isStreak=cnt>0&&streakDays.has(k);
     const day=parseInt(k.slice(8));
-    return `<div title="${k}: ${cnt}問" style="aspect-ratio:1;border-radius:4px;background:${col(cnt)};display:flex;align-items:center;justify-content:center;font-size:8px;color:${cnt?'#55504D':'#ccc'};${isToday?'outline:2px solid #B8A090;outline-offset:1px;font-weight:700':''}">${day}</div>`;
+    const border=isToday?'outline:2px solid #B8A090;outline-offset:1px;font-weight:700':isStreak?'outline:1.5px solid rgba(234,179,8,0.7);outline-offset:1px':'';
+    return `<div title="${k}: ${cnt}問${isStreak?' 🔥':''}" style="aspect-ratio:1;border-radius:4px;background:${col(cnt)};display:flex;align-items:center;justify-content:center;font-size:8px;color:${cnt?'#55504D':'#ccc'};${border}">${day}</div>`;
   }).join('');
   const monthTotal=allDays.filter(Boolean).reduce((s,k)=>s+(weeklyData[k]||0),0);
   return `<div style="margin-top:8px">
@@ -2697,7 +2706,7 @@ function answer(key){
   <div style="font-size:12px;color:${correct?'#166534':'#B8A090'};font-weight:600;margin:4px 0 6px;padding:4px 8px;background:${correct?'rgba(74,222,128,0.08)':'rgba(217,197,178,0.08)'};border-radius:8px">${nmsg}</div>
   ${wrongAns}${correctAns}<div class="explanation" style="position:relative">${highlightExplanation(q.explanation)}<button onclick="navigator.clipboard.writeText('Q: '+this.closest('.explanation').textContent.trim()).then(()=>showToast('解説をコピーしました'))" style="position:absolute;top:4px;right:4px;padding:2px 6px;background:rgba(240,232,222,0.8);border:1px solid rgba(85,80,77,0.15);border-radius:6px;font-size:10px;color:#8A6A50;cursor:pointer;font-family:'Noto Sans JP',sans-serif" title="解説をコピー">📋</button></div>
   ${(()=>{const h=history[q.id];if(!h||h.correct+h.wrong<1) return '';const tot=h.correct+h.wrong;const acc=Math.round(h.correct/tot*100);const srs=srsData[q.id];const accColor=acc>=80?'#16a34a':acc>=60?'#D9A060':'#ef4444';return `<div style="margin-top:6px;padding:4px 10px;background:rgba(237,224,212,0.2);border-radius:8px;font-size:10px;color:#8A6A50;display:flex;gap:10px;align-items:center">この問題: <strong style="color:${accColor}">${acc}%</strong>正答 (${tot}回挑戦)${srs?` · 次の復習: ${srs.due<=todayKey?'今日！':`${Math.max(1,Math.ceil((new Date(srs.due)-new Date())/86400000))}日後`}`:''}</div>`;})()}
-  ${hasMemo?`<div style="margin-top:8px;padding:8px 10px;background:rgba(217,185,80,0.1);border-left:3px solid #D9A060;border-radius:6px;font-size:12px;color:#5A4420">📝 <strong>マイメモ：</strong>${memoData[q.id]}</div>`:''}
+  ${hasMemo?`<div style="margin-top:8px;padding:8px 10px;background:rgba(217,185,80,0.1);border-left:3px solid #D9A060;border-radius:6px;font-size:12px;color:#5A4420">📝 <strong>マイメモ：</strong>${memoData[q.id]}<button onclick="openMemo(${q.id})" style="margin-left:8px;padding:1px 6px;background:none;border:1px solid rgba(217,160,96,0.4);border-radius:6px;font-size:10px;color:#8A6A50;cursor:pointer;font-family:'Noto Sans JP',sans-serif">編集</button></div>`:!correct?`<div style="margin-top:6px"><button onclick="openMemo(${q.id})" style="padding:4px 12px;background:rgba(217,185,80,0.1);border:1px dashed rgba(217,160,96,0.5);border-radius:8px;font-size:10px;color:#8A6A50;cursor:pointer;font-family:'Noto Sans JP',sans-serif;width:100%;text-align:left">📝 この問題にメモを追加して復習に役立てよう ＋</button></div>`:''}
   ${(()=>{
     // 同じ分野の関連問題サジェスト（間違えた問題を優先）
     if(!correct) return '';
@@ -3324,9 +3333,11 @@ function renderWeak(){
     const isMastered=h.correct>h.wrong;
     const bm=bookmarks[id]?'🔖 ':'';
     const memo=memoData[id]?`<div class="memo-tag">📝 ${memoData[id].slice(0,40)}${memoData[id].length>40?'…':''}</div>`:'';
+    const srs=srsData[q.id];
+    const srsBadge=srs?(()=>{const due=new Date(srs.due);const diff=Math.round((due-new Date(todayKey))/(1000*60*60*24));return diff<=0?'<span style="display:inline-block;margin-left:4px;padding:1px 5px;background:rgba(124,58,237,0.15);border-radius:6px;font-size:9px;color:#7c3aed;font-weight:700">SRS今日</span>':diff<=3?`<span style="display:inline-block;margin-left:4px;padding:1px 5px;background:rgba(217,197,178,0.4);border-radius:6px;font-size:9px;color:#8A6A50">${diff}日後</span>`:''})():'';
     return `<div class="weak-item" onclick="drillOne(${q.id})" style="${isMastered?'border-color:rgba(74,222,128,0.35);background:rgba(74,222,128,0.06)':''}">
       <div class="weak-q">${bm}${q.question}</div>
-      <div class="weak-meta">${q.category} ▸ ${q.field} ▸ 間違え${h.wrong}回 / 正解${h.correct}回 ${isMastered?'<span style="color:#16a34a;font-weight:700">✓ 克服</span>':''}</div>
+      <div class="weak-meta">${q.category} ▸ ${q.field} ▸ 間違え${h.wrong}回 / 正解${h.correct}回 ${isMastered?'<span style="color:#16a34a;font-weight:700">✓ 克服</span>':''}${srsBadge}</div>
       ${memo}
     </div>`;
   }).join('');
@@ -3814,10 +3825,16 @@ function renderStats(){
   const weekTrend=weekDiff>0?`▲ ${weekDiff}問増`:weekDiff<0?`▼ ${Math.abs(weekDiff)}問減`:'→ 先週と同じ';
   const weekTrendColor=weekDiff>0?'#16a34a':weekDiff<0?'#dc2626':'#8A6A50';
   const dayLabels=['日','月','火','水','木','金','土'];
+  // Streak days set for heatmap highlighting
+  const heatStreakDays=new Set();
+  let hsd=new Date(todayKey);
+  for(let i=0;i<(streakData.streak||0);i++){heatStreakDays.add(hsd.toISOString().slice(0,10));hsd.setDate(hsd.getDate()-1);}
   const gridCells=allCells.map(d=>{
     if(!d) return `<div style="width:10px;height:10px"></div>`;
     const isToday=d.k===todayKey;
-    return `<div title="${d.k}: ${d.cnt}問" style="width:10px;height:10px;border-radius:2px;background:${heatColor(d.cnt)};${isToday?'outline:2px solid #B8A090;outline-offset:1px':''}"></div>`;
+    const isStreak=d.cnt>0&&heatStreakDays.has(d.k);
+    const border=isToday?'outline:2px solid #B8A090;outline-offset:1px':isStreak?'outline:1.5px solid rgba(234,179,8,0.8);outline-offset:1px':'';
+    return `<div title="${d.k}: ${d.cnt}問${isStreak?' 🔥':''}" style="width:10px;height:10px;border-radius:2px;background:${heatColor(d.cnt)};${border}"></div>`;
   }).join('');
   const weekChart=`<div style="margin-top:16px;text-align:left">
     <div class="cat-stat-header" style="display:flex;justify-content:space-between;align-items:center">
