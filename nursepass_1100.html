@@ -2071,7 +2071,9 @@ function renderFlash(){
       <button class="flash-nav-btn" style="flex:1;background:rgba(74,222,128,.1);border-color:rgba(74,222,128,.4);color:#166534" onclick="flashKnown()">覚えた ✓ <span style="font-size:9px;opacity:0.6">[K]</span></button>
       <button class="flash-nav-btn" style="flex:1;background:rgba(248,113,113,.1);border-color:rgba(248,113,113,.4);color:#991b1b" onclick="flashAgain()">もう一度 <span style="font-size:9px;opacity:0.6">[R]</span></button>
     </div>
-    <div style="padding:0 16px 12px;font-size:10px;text-align:center;color:#8A7060">覚えた: ${Object.values(flashProgress).filter(v=>v==='known').length} / ${FLASH_CARDS.length}枚${customCards.length?` | マイカード: ${customCards.length}枚`:''} <span style="margin-left:6px;opacity:0.6">スペース:めくる ←→:移動</span></div>
+    <div style="padding:0 16px 12px;font-size:10px;text-align:center;color:#8A7060">覚えた: ${Object.values(flashProgress).filter(v=>v==='known').length} / ${FLASH_CARDS.length}枚${customCards.length?` | マイカード: ${customCards.length}枚`:''} <span style="margin-left:6px;opacity:0.6">スペース:めくる ←→:移動</span>
+      <button onclick="resetFlashProgress()" style="margin-left:8px;padding:2px 8px;background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.3);border-radius:8px;font-size:10px;color:#dc2626;cursor:pointer;font-family:'Noto Sans JP',sans-serif">進捗リセット</button>
+    </div>
   </div>`;
 }
 
@@ -2120,6 +2122,13 @@ function flashAgain(){
   flashNext();
 }
 
+function resetFlashProgress(){
+  if(!confirm('暗記カードの進捗（「覚えた」記録）をリセットしますか？')) return;
+  flashProgress={};
+  localStorage.removeItem('np_flash_progress');
+  renderFlash();
+  showToast('暗記カードの進捗をリセットしました');
+}
 function endFlash(){
   document.getElementById('flashArea').style.display='none';
   document.getElementById('tabHome').style.display='block';
@@ -2476,7 +2485,7 @@ function renderQuestion(){
       <div class="quiz-header">
         <button class="back-btn" onclick="clearQuizTimer();backHome()">← 戻る</button>
         <div class="q-progress"><div class="q-bar" style="width:${pct}%"></div></div>
-        <div class="q-count">${isTime?'⏱ ':''}${session.idx+1}/${total}${session.combo>=3?`<span style="color:#f59e0b;font-size:10px;font-weight:700;margin-left:4px">🔥${session.combo}</span>`:''}</div>
+        <div class="q-count" onclick="${!isTime?'jumpToQuestion()':''}" style="${!isTime?'cursor:pointer;text-decoration:underline dotted':''}" title="${!isTime?'タップで問題番号へジャンプ':''}">${isTime?'⏱ ':''}${session.idx+1}/${total}${session.combo>=3?`<span style="color:#f59e0b;font-size:10px;font-weight:700;margin-left:4px">🔥${session.combo}</span>`:''}</div>
       </div>
       ${session.mode==='mock'?`<div id="mockElapsed" style="font-size:10px;color:#8A6A50;text-align:right;padding:2px 20px 0;font-variant-numeric:tabular-nums">⏱ 00:00</div>`:''}
       ${isTime?`<div class="timer-bar"><div class="timer-fill" id="timerFill" style="width:100%"></div></div><div class="timer-count" id="timerCnt">${session.timeLimit}秒</div>`:''}
@@ -2643,6 +2652,23 @@ function startWeakFromHere(){
   renderQuestion();
 }
 function nextQ(){clearQuizTimer();if(autoAdvanceTimer){clearInterval(autoAdvanceTimer);autoAdvanceTimer=null;}session.idx++;renderQuestion();}
+function jumpToQuestion(){
+  if(!session||!session.pool) return;
+  const total=session.pool.length;
+  const chA=document.getElementById('chA');
+  if(chA&&!chA.disabled){
+    const n=prompt(`問題番号を入力（1〜${total}）:\n現在: ${session.idx+1}問目`);
+    if(!n) return;
+    const idx=parseInt(n)-1;
+    if(isNaN(idx)||idx<0||idx>=total){showToast('正しい番号を入力してください');return;}
+    session.idx=idx;
+    session.flipped=false;
+    clearQuizTimer();
+    renderQuestion();
+  } else {
+    showToast('回答後にジャンプできます');
+  }
+}
 function skipQuestion(){
   if(!session||session.mode==='timeatk') return;
   const remaining=session.pool.length-session.idx;
@@ -2662,6 +2688,7 @@ function finishQuiz(){
   const qa=document.getElementById('quizArea');
   const total=session.correct+session.wrong;
   const rate=Math.round(session.correct/total*100);
+  if(rate===100&&total>=5) setTimeout(()=>{launchConfetti();launchConfetti();},400);
   let stars='';
   if(rate>=90) stars='⭐⭐⭐';
   else if(rate>=70) stars='⭐⭐';
@@ -2760,7 +2787,7 @@ function finishQuiz(){
       ${fieldBreakdown}
       ${(()=>{
         const wids=session.wrongIds||[];
-        if(!wids.length) return `<div style="margin:8px 0;padding:10px 14px;background:rgba(74,222,128,0.1);border-radius:12px;font-size:13px;color:#166534;font-weight:700;text-align:center">🎉 全問正解！完璧です！</div>`;
+        if(!wids.length) return `<div style="margin:8px 0;padding:14px;background:linear-gradient(135deg,rgba(253,230,138,0.35),rgba(250,204,21,0.2));border:2px solid rgba(234,179,8,0.5);border-radius:14px;text-align:center"><div style="font-size:22px;margin-bottom:4px">🏆</div><div style="font-size:15px;font-weight:700;color:#92400e">全問正解！完璧です！</div><div style="font-size:11px;color:#a16207;margin-top:4px">${total >= 10 ? '💯 パーフェクトバッジ獲得！' : 'おめでとう！'}</div></div>`;
         return `<div style="margin:10px 0;text-align:left">
           <div style="font-size:11px;font-weight:700;color:#991b1b;margin-bottom:6px;padding:0 2px">✗ 間違えた問題（${wids.length}問）</div>
           ${wids.map((id,wi)=>{const q=QUESTIONS.find(x=>x.id===id);if(!q)return'';const expId=`wrongExp_${wi}`;return`<div style="margin-bottom:6px;border:1px solid rgba(248,113,113,0.3);border-radius:12px;background:rgba(248,113,113,0.03);overflow:hidden"><div onclick="const e=document.getElementById('${expId}');const open=e.style.display==='block';e.style.display=open?'none':'block';this.querySelector('.exp-arrow').textContent=open?'▸':'▾'" style="padding:10px 12px;cursor:pointer;display:flex;align-items:flex-start;gap:6px"><span class="exp-arrow" style="color:#dc2626;font-size:11px;min-width:12px;margin-top:2px">▸</span><div style="flex:1"><div style="font-size:12px;color:#55504D;font-weight:600;line-height:1.4">${q.question}</div><div style="font-size:10px;color:#B8907A;margin-top:3px">正解: ${q.answer}. ${q.choices[q.answer]}</div></div></div><div id="${expId}" style="display:none;padding:0 12px 10px"><div style="font-size:11px;color:#5A5450;line-height:1.6;padding:8px 10px;background:rgba(255,255,255,0.6);border-radius:8px">${q.explanation}</div><button onclick="drillOne(${id})" style="margin-top:6px;padding:5px 12px;background:rgba(239,68,68,0.1);color:#dc2626;border:1px solid rgba(239,68,68,0.2);border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif">もう一度解く →</button></div></div>`;}).join('')}
