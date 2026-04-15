@@ -354,6 +354,7 @@ body.font-xl .explanation{font-size:15px}
     </div>
     <div style="text-align:center;font-size:12px;margin-bottom:10px" id="examCountdown"></div>
     <div id="noaCard" style="margin-bottom:10px"></div>
+    <div id="dailyTipCard" style="margin-bottom:10px"></div>
     <div style="background:rgba(255,255,255,0.85);border:1px solid rgba(85,80,77,0.15);border-radius:14px;padding:10px 14px;margin-bottom:10px" id="goalBar"></div>
     <div id="pomodoroWidget" style="margin-bottom:10px"></div>
     <div id="todayPlanCard" style="margin-bottom:10px"></div>
@@ -637,7 +638,7 @@ function seededRand(seed){let x=Math.sin(seed+1)*10000;return x-Math.floor(x);}
 function shareResult(rate, total, correct){
   const stars=rate>=90?'🌟🌟🌟':rate>=70?'🌟🌟':'🌟';
   const streak=streakData.streak||0;
-  const modeLabel={'random':'ランダム','field':'分野別','weak':'苦手強化','hisshu':'必修50問','ippan50':'一般50問','timeatk':'タイムアタック','mock':'模擬試験','daily':'デイリーチャレンジ','srs':'SRS復習','allcat':'100問一気','lastmin':'試験直前','bookmark':'ブックマーク演習'}[session.mode]||'演習';
+  const modeLabel={'random':'ランダム','field':'分野別','weak':'苦手強化','hisshu':'必修50問','ippan50':'一般50問','timeatk':'タイムアタック','mock':'模擬試験','daily':'デイリーチャレンジ','srs':'SRS復習','allcat':'100問一気','lastmin':'試験直前','bookmark':'ブックマーク演習','streak10':'10連続正解チャレンジ'}[session.mode]||'演習';
   const bar=Array(10).fill('░').map((_,i)=>i<Math.round(rate/10)?'█':'░').join('');
   const todayTotal=weeklyData[todayKey]||0;
   const answered=Object.values(history).reduce((s,h)=>s+h.correct+h.wrong,0);
@@ -884,7 +885,7 @@ function saveBestScore(mode, rate, correct, total){
   localStorage.setItem('np_daily_acc',JSON.stringify(dailyAccuracy));
 }
 function getModeLabel(mode){
-  return{random:'ランダム',field:'分野別',weak:'苦手強化',hisshu:'必修50問',ippan50:'一般50問',timeatk:'タイムアタック',mock:'模擬試験',daily:'デイリー',srs:'SRS復習',allcat:'100問一気',drill:'1問解説',lastmin:'試験直前',flagged:'難問特訓'}[mode]||mode;
+  return{random:'ランダム',field:'分野別',weak:'苦手強化',hisshu:'必修50問',ippan50:'一般50問',timeatk:'タイムアタック',mock:'模擬試験',daily:'デイリー',srs:'SRS復習',allcat:'100問一気',drill:'1問解説',lastmin:'試験直前',flagged:'難問特訓',streak10:'10連続チャレンジ'}[mode]||mode;
 }
 // 今日の間違い・1日目標
 let todayWrong = JSON.parse(localStorage.getItem('np_today_wrong')||'{"date":"","ids":[]}');
@@ -1213,6 +1214,53 @@ function renderNoaCard(){
     </div>
   </div>`;
 }
+// のあ先生デイリーヒント
+const NOA_TIPS=[
+  {icon:'💊',text:'薬の5R（正しい患者・薬・量・経路・時間）は毎回確認。投薬エラーの大半はダブルチェックで防げます。'},
+  {icon:'🫀',text:'心電図のP-QRS-Tは「心房→房室→心室」の順。QT延長は致死性不整脈のサインなので要注意！'},
+  {icon:'🩺',text:'フィジカルアセスメントは「視診→触診→打診→聴診」の順が基本。腹部だけは聴診を先に行います。'},
+  {icon:'🧠',text:'グラスゴー・コーマ・スケール（GCS）は開眼E4・言語V5・運動M6の計15点満点。8点以下は重篤です。'},
+  {icon:'🌡️',text:'体温38.5℃以上で解熱剤を検討。ただし発熱は免疫反応なので、バイタルと全身状態を合わせて判断を。'},
+  {icon:'💉',text:'輸液の滴下数計算：mL÷時間÷60×滴/mL係数。成人用20滴/mL、小児用60滴/mLを覚えておこう。'},
+  {icon:'🫁',text:'SpO₂は95%以上が目安。90%以下はチアノーゼリスク。測定前に末梢循環の確認を忘れずに。'},
+  {icon:'🩸',text:'血液型ABO不適合輸血は輸血開始後15分以内に症状が出ることが多い。開始直後の観察が命綱です。'},
+  {icon:'💪',text:'廃用症候群は1日の安静で3〜5%の筋力低下。早期離床・リハビリが褥瘡・血栓・肺炎の予防にもなる。'},
+  {icon:'🧪',text:'血糖の基準値は空腹時70〜110mg/dL。低血糖症状（50mg/dL以下）は意識障害になるため、ブドウ糖投与が優先。'},
+  {icon:'🩹',text:'褥瘡の発生要因は「圧迫・ずれ・摩擦・湿潤」。仙骨・踵・大転子は特に注意。2時間ごとの体位変換が予防の要。'},
+  {icon:'😴',text:'睡眠は免疫・記憶定着・細胞修復に必須。睡眠不足は判断力も低下させる。あなたも十分休んでね。'},
+  {icon:'🌊',text:'脱水の種類は水欠乏性・塩分欠乏性・混合性の3つ。皮膚ツルゴールや口腔内の乾燥度を確認しよう。'},
+  {icon:'❤️',text:'心不全のS3ギャロップ音は左心不全のサイン。起座呼吸・発作性夜間呼吸困難も重要な所見です。'},
+  {icon:'🧬',text:'敗血症のqSOFAスコアは意識変容・呼吸数≥22・収縮期血圧≤100。2項目以上でICU入室を検討。'},
+  {icon:'🌸',text:'コミュニケーションで大切なのは「聴く」こと。患者さんの言葉を繰り返す（オウム返し）は信頼関係の第一歩。'},
+  {icon:'⚡',text:'除細動（AED）はVF・無脈性VTに有効。まず確認→CPR→除細動のサイクルを迷わず実践しよう。'},
+  {icon:'🦴',text:'骨折の5P：Pain・Pallor・Pulselessness・Paresthesia・Paralysis。コンパートメント症候群の早期発見に使えます。'},
+  {icon:'🌿',text:'ストレスマネジメントはあなた自身にも必要。深呼吸・ストレッチ・睡眠確保が勉強効率を上げます。'},
+  {icon:'🍼',text:'新生児のApgarスコアは1分・5分に測定。7点以上が正常、4〜6点は軽〜中等度仮死、3点以下は重篤。'},
+  {icon:'🌈',text:'SBAR（Situation・Background・Assessment・Recommendation）は医療コミュニケーションの国際標準。申し送りに活用しよう。'},
+  {icon:'💡',text:'意識レベルはJCS（日本昏睡スケール）とGCSの両方を押さえておこう。日本の臨床ではJCSが多く使われます。'},
+  {icon:'🍵',text:'飲み込みが難しい患者さんへのとろみ剤：薄いとろみ→中間→濃いとろみの3段階。水は誤嚥しやすいので要注意。'},
+  {icon:'🔬',text:'尿検査の基準値：蛋白(−)・糖(−)・ケトン体(−)・潜血(−)。異常値は腎臓・糖尿病・泌尿器疾患のサインです。'},
+  {icon:'📊',text:'体格指数BMI＝体重(kg)÷身長(m)²。18.5未満が低体重、25以上が過体重（肥満）の目安です。'},
+  {icon:'🎯',text:'暗記より理解が大切。「なぜこの処置をするか」を考えながら勉強すると、応用問題にも強くなれるよ。'},
+  {icon:'✨',text:'間違えた問題こそ宝物。エラーの理由を一言書いておくと記憶に定着します。苦手を克服するチャンスです！'},
+  {icon:'🌙',text:'夜の勉強より朝の復習が効率的。睡眠中に記憶が定着するから、寝る前に見たものを翌朝確認しよう。'},
+  {icon:'📝',text:'看護過程（ADPIE）：Assessment・Diagnosis・Planning・Implementation・Evaluation。患者中心のケアの基盤です。'},
+  {icon:'🏆',text:'あなたが目指す看護師は、知識だけでなく、患者さんの不安に寄り添える人。その心こそ最大の強みです。'},
+];
+function renderDailyTip(){
+  const el=document.getElementById('dailyTipCard');
+  if(!el) return;
+  const seed=parseInt(todayKey.replace(/-/g,''))%NOA_TIPS.length;
+  const tip=NOA_TIPS[seed];
+  el.innerHTML=`<div style="background:linear-gradient(135deg,rgba(253,242,255,0.85),rgba(245,232,255,0.75));border:1.5px solid rgba(200,170,230,0.35);border-radius:14px;padding:10px 14px;display:flex;gap:10px;align-items:flex-start">
+    <div style="font-size:20px;flex-shrink:0;margin-top:2px">${tip.icon}</div>
+    <div>
+      <div style="font-size:10px;font-weight:700;color:#9B6AC0;letter-spacing:.8px;margin-bottom:3px">のあ先生の今日のひとこと</div>
+      <div style="font-size:12px;color:#4A3050;line-height:1.7">${tip.text}</div>
+    </div>
+  </div>`;
+}
+
 // ダークモード & フォントサイズ
 let isDark=localStorage.getItem('np_dark')==='1';
 let fontLevel=parseInt(localStorage.getItem('np_font')||'0');
@@ -2257,6 +2305,7 @@ function initModeButtons(){
       <button class="mode-btn" onclick="startQuiz('allcat')"><div class="mode-icon">🏃</div><div class="mode-title">100問一気</div><div class="mode-desc">本番形式</div></button>
       <button class="mode-btn" onclick="startQuiz('hisshu')" style="border-color:rgba(217,197,178,0.5);background:rgba(237,224,212,0.9);grid-column:1/-1"><div class="mode-icon">⭐</div><div class="mode-title">必修50問 本番形式</div><div class="mode-desc">合格ライン80%（40/50問）で合否判定</div></button>
       <button class="mode-btn" onclick="startQuiz('lastmin')" style="border-color:rgba(239,68,68,0.4);background:linear-gradient(135deg,rgba(254,226,226,0.9),rgba(255,215,215,0.85));grid-column:1/-1"><div class="mode-icon">🚨</div><div class="mode-title">試験直前モード</div><div class="mode-desc">未克服の頻出問題＋SRS期限問題を最大30問</div></button>
+      <button class="mode-btn" onclick="startQuiz('streak10')" style="border-color:rgba(234,179,8,0.4);background:linear-gradient(135deg,rgba(253,230,138,0.25),rgba(250,204,21,0.15));grid-column:1/-1"><div class="mode-icon">🔥</div><div class="mode-title">10連続正解チャレンジ</div><div class="mode-desc">1問でも間違えたらゲームオーバー！10問連続正解を目指せ</div></button>
       ${flaggedIds.size>0?`<button class="mode-btn" onclick="startQuiz('flagged')" style="border-color:rgba(239,68,68,0.3);background:linear-gradient(135deg,rgba(255,237,213,0.9),rgba(254,215,170,0.85));grid-column:1/-1"><div class="mode-icon">🔖</div><div class="mode-title">難問特訓（${flaggedIds.size}問）</div><div class="mode-desc">フラグを付けた難しかった問題だけ</div></button>`:''}
       ${Object.keys(bookmarks).length>0?`<button class="mode-btn" onclick="startQuiz('bookmark')" style="border-color:rgba(59,130,246,0.3);background:linear-gradient(135deg,rgba(219,234,254,0.9),rgba(191,219,254,0.85));grid-column:1/-1"><div class="mode-icon">🔖</div><div class="mode-title">ブックマーク演習（${Object.keys(bookmarks).length}問）</div><div class="mode-desc">ブックマーク済みの問題を出題</div></button>`:''}
       <button class="mode-btn" onclick="showFlashCards()" style="border-color:rgba(184,160,144,0.5);background:linear-gradient(135deg,rgba(245,239,232,0.95),rgba(237,224,212,0.9));grid-column:1/-1"><div class="mode-icon">🃏</div><div class="mode-title">暗記カード</div><div class="mode-desc">検査値・薬物・看護技術など76枚</div></button>
@@ -2274,6 +2323,7 @@ function initModeButtons(){
       <button class="mode-btn" onclick="startQuiz('allcat')"><div class="mode-icon">🏃</div><div class="mode-title">100問一気</div><div class="mode-desc">本番形式</div></button>
       <button class="mode-btn" onclick="startQuiz('ippan50')" style="border-color:rgba(217,197,178,0.5);background:rgba(237,224,212,0.9);grid-column:1/-1"><div class="mode-icon">📚</div><div class="mode-title">一般問題 50問演習</div><div class="mode-desc">11分野からバランスよく出題</div></button>
       <button class="mode-btn" onclick="startQuiz('lastmin')" style="border-color:rgba(239,68,68,0.4);background:linear-gradient(135deg,rgba(254,226,226,0.9),rgba(255,215,215,0.85));grid-column:1/-1"><div class="mode-icon">🚨</div><div class="mode-title">試験直前モード</div><div class="mode-desc">未克服の頻出問題＋SRS期限問題を最大30問</div></button>
+      <button class="mode-btn" onclick="startQuiz('streak10')" style="border-color:rgba(234,179,8,0.4);background:linear-gradient(135deg,rgba(253,230,138,0.25),rgba(250,204,21,0.15));grid-column:1/-1"><div class="mode-icon">🔥</div><div class="mode-title">10連続正解チャレンジ</div><div class="mode-desc">1問でも間違えたらゲームオーバー！10問連続正解を目指せ</div></button>
       ${flaggedIds.size>0?`<button class="mode-btn" onclick="startQuiz('flagged')" style="border-color:rgba(239,68,68,0.3);background:linear-gradient(135deg,rgba(255,237,213,0.9),rgba(254,215,170,0.85));grid-column:1/-1"><div class="mode-icon">🔖</div><div class="mode-title">難問特訓（${flaggedIds.size}問）</div><div class="mode-desc">フラグを付けた難しかった問題だけ</div></button>`:''}
       ${Object.keys(bookmarks).length>0?`<button class="mode-btn" onclick="startQuiz('bookmark')" style="border-color:rgba(59,130,246,0.3);background:linear-gradient(135deg,rgba(219,234,254,0.9),rgba(191,219,254,0.85));grid-column:1/-1"><div class="mode-icon">🔖</div><div class="mode-title">ブックマーク演習（${Object.keys(bookmarks).length}問）</div><div class="mode-desc">ブックマーク済みの問題を出題</div></button>`:''}
       <button class="mode-btn" onclick="showFlashCards()" style="border-color:rgba(184,160,144,0.5);background:linear-gradient(135deg,rgba(245,239,232,0.95),rgba(237,224,212,0.9));grid-column:1/-1"><div class="mode-icon">🃏</div><div class="mode-title">暗記カード</div><div class="mode-desc">検査値・薬物・看護技術など76枚</div></button>
@@ -2291,6 +2341,7 @@ function initModeButtons(){
       <button class="mode-btn" onclick="startQuiz('allcat')"><div class="mode-icon">🏃</div><div class="mode-title">全問一気</div><div class="mode-desc">本番形式</div></button>
       <button class="mode-btn" onclick="startJokyoMode()" style="border-color:rgba(5,150,105,0.5);background:rgba(230,255,245,0.9);grid-column:1/-1"><div class="mode-icon">📋</div><div class="mode-title">状況設定 専用モード</div><div class="mode-desc">事例を1問ずつ、丁寧に解く</div></button>
       <button class="mode-btn" onclick="startQuiz('lastmin')" style="border-color:rgba(239,68,68,0.4);background:linear-gradient(135deg,rgba(254,226,226,0.9),rgba(255,215,215,0.85));grid-column:1/-1"><div class="mode-icon">🚨</div><div class="mode-title">試験直前モード</div><div class="mode-desc">未克服の頻出問題＋SRS期限問題を最大30問</div></button>
+      <button class="mode-btn" onclick="startQuiz('streak10')" style="border-color:rgba(234,179,8,0.4);background:linear-gradient(135deg,rgba(253,230,138,0.25),rgba(250,204,21,0.15));grid-column:1/-1"><div class="mode-icon">🔥</div><div class="mode-title">10連続正解チャレンジ</div><div class="mode-desc">1問でも間違えたらゲームオーバー！10問連続正解を目指せ</div></button>
       ${flaggedIds.size>0?`<button class="mode-btn" onclick="startQuiz('flagged')" style="border-color:rgba(239,68,68,0.3);background:linear-gradient(135deg,rgba(255,237,213,0.9),rgba(254,215,170,0.85));grid-column:1/-1"><div class="mode-icon">🔖</div><div class="mode-title">難問特訓（${flaggedIds.size}問）</div><div class="mode-desc">フラグを付けた難しかった問題だけ</div></button>`:''}
       ${Object.keys(bookmarks).length>0?`<button class="mode-btn" onclick="startQuiz('bookmark')" style="border-color:rgba(59,130,246,0.3);background:linear-gradient(135deg,rgba(219,234,254,0.9),rgba(191,219,254,0.85));grid-column:1/-1"><div class="mode-icon">🔖</div><div class="mode-title">ブックマーク演習（${Object.keys(bookmarks).length}問）</div><div class="mode-desc">ブックマーク済みの問題を出題</div></button>`:''}
       <button class="mode-btn" onclick="showFlashCards()" style="border-color:rgba(184,160,144,0.5);background:linear-gradient(135deg,rgba(245,239,232,0.95),rgba(237,224,212,0.9));grid-column:1/-1"><div class="mode-icon">🃏</div><div class="mode-title">暗記カード</div><div class="mode-desc">検査値・薬物・看護技術など76枚</div></button>
@@ -2393,6 +2444,13 @@ function startQuiz(mode){
     pool=shuffle(QUESTIONS.filter(q=>flaggedIds.has(q.id)));
     if(!pool.length){alert('難問フラグが設定された問題がありません。\n解答後に「🤔 難しかった」ボタンでフラグを付けましょう。');return;}
     session={pool,idx:0,correct:0,wrong:0,mode:'flagged'};
+    showQuiz();
+    return;
+  }
+  else if(mode==='streak10'){
+    // 10連続正解チャレンジ: 全問からランダム、1問でも誤答でゲームオーバー
+    pool=shuffle([...QUESTIONS]).slice(0,50); // 最大50問をバッファとして用意
+    session={pool,idx:0,correct:0,wrong:0,mode:'streak10',streakTarget:10,currentStreak:0};
     showQuiz();
     return;
   }
@@ -2656,6 +2714,18 @@ function answer(key){
     if(!session.wrongIds.includes(q.id))session.wrongIds.push(q.id);
   }
   if(session.mode==='daily'&&dailyChallenge){dailyChallenge.correct=session.correct;dailyChallenge.total=session.correct+session.wrong;}
+  // streak10: track current streak, end immediately on wrong answer
+  if(session.mode==='streak10'){
+    if(correct){
+      session.currentStreak=(session.currentStreak||0)+1;
+      if(session.currentStreak>=session.streakTarget){
+        // 10連続達成！
+        setTimeout(()=>{launchConfetti();launchConfetti();showToast('🏆 10連続正解達成！すごい！！');},200);
+      }
+    } else {
+      session.streakGameOver=true;
+    }
+  }
 
   Object.keys(q.choices).forEach(k=>{
     const btn=document.getElementById('ch'+k);
@@ -2734,7 +2804,8 @@ function answer(key){
   res.after(mc);
 
   const isLast=session.idx>=session.pool.length-1;
-  const is5=(session.idx+1)%5===0&&!isLast;
+  const streak10End=session.mode==='streak10'&&(session.streakGameOver||(session.currentStreak||0)>=session.streakTarget);
+  const is5=(session.idx+1)%5===0&&!isLast&&!streak10End;
   if(is5){
     const cc=document.createElement('div');
     cc.className='continue-card';
@@ -2748,8 +2819,8 @@ function answer(key){
   } else {
     const nb=document.createElement('button');
     nb.className='next-btn';nb.id='nextBtn';
-    nb.textContent=isLast?'結果を見る →':'次の問題 →';
-    nb.onclick=isLast?finishQuiz:nextQ;
+    nb.textContent=(isLast||streak10End)?'結果を見る →':'次の問題 →';
+    nb.onclick=(isLast||streak10End)?finishQuiz:nextQ;
     mc.after(nb);
   }
 }
@@ -2814,6 +2885,15 @@ function finishQuiz(){
     dailyChallenge.done=true;dailyChallenge.correct=session.correct;dailyChallenge.total=total;
     localStorage.setItem('np_daily',JSON.stringify(dailyChallenge));
     initModeButtons(); // デイリーボタン更新
+  }
+  var streak10Result = '';
+  if(session.mode==='streak10'){
+    const streak=session.currentStreak||0;
+    const won=streak>=session.streakTarget;
+    streak10Result=`<div style="margin:0 0 12px;padding:12px 14px;border-radius:14px;font-size:14px;font-weight:700;text-align:center;background:${won?'linear-gradient(135deg,rgba(253,230,138,0.4),rgba(250,204,21,0.25))':'rgba(248,113,113,0.1)'};border:2px solid ${won?'rgba(234,179,8,0.5)':'rgba(239,68,68,0.3)'}">
+      ${won?`🏆 10連続正解チャレンジ達成！！`:`💪 ${streak}連続正解でゲームオーバー`}
+      <div style="font-size:11px;font-weight:400;margin-top:4px;color:${won?'#92400e':'#991b1b'}">${won?'完璧なパフォーマンスです！もう一度挑戦してさらなる記録を狙おう！':`最高${session.streakTarget}問連続正解を目指して再挑戦しよう！`}</div>
+    </div>`;
   }
   var hisshuResult = '';
   if(session.mode==='hisshu'){
@@ -2907,7 +2987,7 @@ function finishQuiz(){
   })();
   qa.innerHTML=`<div class="card" style="animation:fadein .4s ease">
     <div class="result-summary">
-      ${hisshuResult}${mockResult}<div class="result-stars">${stars}</div>
+      ${streak10Result}${hisshuResult}${mockResult}<div class="result-stars">${stars}</div>
       <div class="result-big">${rate}%</div>
       <div class="result-label2">${total}問中 ${session.correct}問正解</div>
       ${speedSummary}
@@ -3400,6 +3480,23 @@ function drillOne(id){
   session={pool:[q],idx:0,correct:0,wrong:0,mode:'drill'};
   showQuiz();
 }
+function drillField(fieldName){
+  // 苦手分野のランダム20問 (間違えた問題を優先)
+  const all=QUESTIONS.filter(q=>q.field===fieldName);
+  const wrong=all.filter(q=>history[String(q.id)]&&history[String(q.id)].wrong>0);
+  const rest=all.filter(q=>!history[String(q.id)]||history[String(q.id)].wrong===0);
+  const pool=shuffle([...wrong,...rest]).slice(0,20);
+  if(!pool.length){showToast('この分野の問題が見つかりません');return;}
+  // Switch to home tab first
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tabHome').style.display='';
+  document.getElementById('tabWeak').style.display='none';
+  document.getElementById('tabStats').style.display='none';
+  document.getElementById('tabNoa').style.display='none';
+  session={pool,idx:0,correct:0,wrong:0,mode:'field'};
+  showQuiz();
+  showToast(`${fieldName.replace('必修・','').replace('一般・','').replace('状況設定・','')} の特訓開始！`);
+}
 
 // のあ先生AI学習分析
 async function requestNoaAnalysis(){
@@ -3546,11 +3643,14 @@ function renderFieldRanking(){
   if(ranked.length<3) return '';
   const top3=ranked.slice(0,3);
   const bot3=ranked.slice(-3).reverse();
+  // Map short field name back to QUESTIONS field for drill
+  const fieldNameMap={};
+  QUESTIONS.forEach(q=>{const f=q.field.replace('必修・','').replace('一般・','').replace('状況設定・','');fieldNameMap[f]=q.field;});
   const row=(r,i,good)=>`<div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid rgba(85,80,77,0.06)">
     <span style="font-size:12px;font-weight:700;color:${good?'#16a34a':'#dc2626'};min-width:22px">${i+1}位</span>
     <span style="flex:1;font-size:11px;color:#4A3828;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.f}</span>
     <span style="font-size:12px;font-weight:700;color:${good?'#16a34a':'#dc2626'}">${r.acc}%</span>
-    <span style="font-size:9px;color:#8A7060">(${r.t}問)</span>
+    ${!good?`<button onclick="drillField('${(fieldNameMap[r.f]||r.f).replace(/'/g,'')}')" style="padding:2px 8px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);border-radius:8px;font-size:9px;color:#dc2626;cursor:pointer;font-family:'Noto Sans JP',sans-serif;white-space:nowrap">特訓</button>`:`<span style="font-size:9px;color:#8A7060">(${r.t}問)</span>`}
   </div>`;
   return `<div style="margin-bottom:14px;padding:12px 14px;background:linear-gradient(135deg,rgba(245,239,232,0.9),rgba(235,225,210,0.85));border:1.5px solid rgba(217,197,178,0.4);border-radius:14px">
     <div style="font-size:11px;font-weight:700;color:#B8907A;margin-bottom:8px">🏅 分野別強弱ランキング（3問以上解答済み）</div>
@@ -3560,7 +3660,7 @@ function renderFieldRanking(){
         ${top3.map((r,i)=>row(r,i,true)).join('')}
       </div>
       <div>
-        <div style="font-size:10px;font-weight:700;color:#dc2626;margin-bottom:4px">📌 苦手分野</div>
+        <div style="font-size:10px;font-weight:700;color:#dc2626;margin-bottom:4px">📌 苦手分野（特訓ボタンで即演習）</div>
         ${bot3.map((r,i)=>row(r,i,false)).join('')}
       </div>
     </div>
@@ -5230,7 +5330,7 @@ updateScoreBadge();
 initDailyMessage();
 renderHomeSummary();
 renderExamCountdown();
-renderGoalBar();renderNoaCard();renderDailyBanner();
+renderGoalBar();renderNoaCard();renderDailyTip();renderDailyBanner();
 showResumeBanner();
 initPomodoro();
 renderTodayPlan();
