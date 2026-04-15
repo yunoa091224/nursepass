@@ -1266,10 +1266,10 @@ function renderFlash(){
       <button class="flash-nav-btn" onclick="flashNext()">次へ →</button>
     </div>
     <div style="display:flex;gap:8px;padding:0 16px 16px">
-      <button class="flash-nav-btn" style="flex:1;background:rgba(74,222,128,.1);border-color:rgba(74,222,128,.4);color:#166534" onclick="flashKnown()">覚えた ✓</button>
-      <button class="flash-nav-btn" style="flex:1;background:rgba(248,113,113,.1);border-color:rgba(248,113,113,.4);color:#991b1b" onclick="flashAgain()">もう一度</button>
+      <button class="flash-nav-btn" style="flex:1;background:rgba(74,222,128,.1);border-color:rgba(74,222,128,.4);color:#166534" onclick="flashKnown()">覚えた ✓ <span style="font-size:9px;opacity:0.6">[K]</span></button>
+      <button class="flash-nav-btn" style="flex:1;background:rgba(248,113,113,.1);border-color:rgba(248,113,113,.4);color:#991b1b" onclick="flashAgain()">もう一度 <span style="font-size:9px;opacity:0.6">[R]</span></button>
     </div>
-    <div style="padding:0 16px 12px;font-size:10px;text-align:center;color:#8A7060">覚えた: ${Object.values(flashProgress).filter(v=>v==='known').length} / ${FLASH_CARDS.length}枚</div>
+    <div style="padding:0 16px 12px;font-size:10px;text-align:center;color:#8A7060">覚えた: ${Object.values(flashProgress).filter(v=>v==='known').length} / ${FLASH_CARDS.length}枚 <span style="margin-left:6px;opacity:0.6">スペース:めくる ←→:移動</span></div>
   </div>`;
 }
 
@@ -3183,6 +3183,17 @@ document.addEventListener('keydown', function(e){
   // 入力フィールドにいる場合は無視
   const tag=e.target.tagName;
   if(tag==='INPUT'||tag==='TEXTAREA') return;
+  const key=e.key.toUpperCase();
+  // フラッシュカード画面
+  const fa=document.getElementById('flashArea');
+  if(fa&&fa.style.display!=='none'){
+    if(key===' '||key==='ARROWUP'||key==='ARROWDOWN'){e.preventDefault();flashFlip();}
+    else if(key==='ARROWRIGHT'){e.preventDefault();flashNext();}
+    else if(key==='ARROWLEFT'){e.preventDefault();flashPrev();}
+    else if(key==='K'){flashKnown();}
+    else if(key==='R'){flashAgain();}
+    return;
+  }
   // クイズ画面が表示中のみ有効
   const qa=document.getElementById('quizArea');
   if(!qa||qa.style.display==='none') return;
