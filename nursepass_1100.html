@@ -322,6 +322,7 @@ body.font-xl .explanation{font-size:15px}
       <div class="score-badge">正答率 <span id="rateDisp">--%</span></div>
       <button onclick="toggleDark()" id="darkBtn" title="ダークモード" style="background:none;border:none;cursor:pointer;font-size:18px;padding:2px 4px;line-height:1;border-radius:8px;transition:.15s">🌙</button>
       <button onclick="cycleFontSize()" id="fontBtn" title="文字サイズ" style="background:none;border:none;cursor:pointer;font-size:13px;padding:2px 6px;line-height:1;border-radius:8px;border:1px solid rgba(85,80,77,0.25);color:#5A5450;font-family:'Noto Sans JP',sans-serif">A</button>
+      <button onclick="toggleHaptic()" id="hapticBtn" title="バイブレーション" style="background:none;border:none;cursor:pointer;font-size:16px;padding:2px 4px;line-height:1;border-radius:8px;opacity:0.6">📳</button>
     </div>
   </div>
 
@@ -597,6 +598,21 @@ let wrongChoices=JSON.parse(localStorage.getItem('np_wrong_choices')||'{}');
 let srsData=JSON.parse(localStorage.getItem('np_srs')||'{}');
 // 難問フラグ: Set of question IDs flagged as "難しかった"
 let flaggedIds=new Set(JSON.parse(localStorage.getItem('np_flags')||'[]'));
+// バイブレーション（触覚フィードバック）
+let hapticEnabled=localStorage.getItem('np_haptic')!=='0';
+function toggleHaptic(){
+  hapticEnabled=!hapticEnabled;
+  localStorage.setItem('np_haptic',hapticEnabled?'1':'0');
+  const btn=document.getElementById('hapticBtn');
+  if(btn) btn.style.opacity=hapticEnabled?'1':'0.3';
+  if(hapticEnabled&&navigator.vibrate) navigator.vibrate(50);
+  showToast(hapticEnabled?'バイブレーションON':'バイブレーションOFF');
+}
+function haptic(correct){
+  if(!hapticEnabled||!navigator.vibrate) return;
+  navigator.vibrate(correct?40:[80,40,80]);
+}
+(()=>{const btn=document.getElementById('hapticBtn');if(btn)btn.style.opacity=hapticEnabled?'1':'0.3';})();
 // 正解後自動送り設定
 let autoAdvance=localStorage.getItem('np_auto_advance')==='1';
 let autoAdvanceTimer=null;
@@ -846,6 +862,17 @@ function getModeLabel(mode){
 let todayWrong = JSON.parse(localStorage.getItem('np_today_wrong')||'{"date":"","ids":[]}');
 if(todayWrong.date!==todayKey) todayWrong={date:todayKey,ids:[]};
 let dailyGoal = parseInt(localStorage.getItem('np_goal')||'20');
+let weeklyGoal = parseInt(localStorage.getItem('np_weekly_goal')||'0'); // 0 = not set
+function setWeeklyGoal(){
+  const v=prompt('今週の目標問題数を設定してください（0で解除）',weeklyGoal||100);
+  const n=parseInt(v);
+  if(v===null) return;
+  weeklyGoal=(!v||isNaN(n)||n<0)?0:Math.min(n,1000);
+  localStorage.setItem('np_weekly_goal',weeklyGoal);
+  renderGoalBar();
+  if(weeklyGoal>0) showToast(`今週の目標: ${weeklyGoal}問に設定しました`);
+  else showToast('週間目標を解除しました');
+}
 function saveTodayWrong(){localStorage.setItem('np_today_wrong',JSON.stringify(todayWrong));}
 function setDailyGoal(){
   const v=prompt('1日の目標問題数を設定してください（5〜100）',dailyGoal);
@@ -869,7 +896,24 @@ function renderGoalBar(){
   </div>
   <div style="height:6px;background:rgba(237,224,212,0.4);border-radius:10px;overflow:hidden">
     <div style="width:${pct}%;height:100%;background:${done?'linear-gradient(90deg,#4ade80,#16a34a)':'linear-gradient(90deg,#D9C5B2,#B8A090)'};border-radius:10px;transition:.5s"></div>
-  </div>`;
+  </div>
+  ${(()=>{
+    if(!weeklyGoal) return `<div style="font-size:10px;color:#aaa;text-align:center;margin-top:4px;cursor:pointer" onclick="setWeeklyGoal()">+ 週間目標を設定</div>`;
+    // Compute this week total (Mon-Sun)
+    let wkTotal=0;
+    for(let i=0;i<7;i++){const d=new Date();const dow=d.getDay()||7;d.setDate(d.getDate()-(dow-1)+i);wkTotal+=(weeklyData[d.toISOString().slice(0,10)]||0);}
+    const wPct=Math.min(Math.round(wkTotal/weeklyGoal*100),100);
+    const wDone=wkTotal>=weeklyGoal;
+    return `<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(217,197,178,0.3)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <span style="font-size:10px;color:#8A6A50;font-weight:600">📅 今週の目標 <span style="cursor:pointer;text-decoration:underline" onclick="setWeeklyGoal()">${weeklyGoal}問</span></span>
+        <span style="font-size:10px;color:${wDone?'#16a34a':'#B8907A'};font-weight:700">${wkTotal}/${weeklyGoal}問${wDone?' ✓ 達成！':''}</span>
+      </div>
+      <div style="height:5px;background:rgba(237,224,212,.3);border-radius:6px;overflow:hidden">
+        <div style="width:${wPct}%;height:100%;background:${wDone?'linear-gradient(90deg,#4ade80,#16a34a)':'linear-gradient(90deg,#BDC7C1,#8A9990)'};border-radius:6px;transition:.5s"></div>
+      </div>
+    </div>`;
+  })()}`;
 }
 // 今日の1問カード（ホーム画面）
 let qodAnswered=JSON.parse(localStorage.getItem('np_qod')||'null');
@@ -2388,6 +2432,7 @@ function answer(key){
     else if(q.category==='状況設定') session.jokyoCorrect=(session.jokyoCorrect||0)+1;
   }
   if(session.answerLog) session.answerLog.push(correct?1:0);
+  haptic(correct);
   if(correct){
     session.correct++;
     session.combo=(session.combo||0)+1;
@@ -2469,6 +2514,7 @@ function answer(key){
     <button id="flagBtn_${q.id}" onclick="flagQuestion(${q.id})" style="padding:5px 10px;background:${flaggedIds.has(q.id)?'rgba(239,68,68,0.12)':'rgba(240,232,222,0.8)'};color:${flaggedIds.has(q.id)?'#dc2626':'#8A6A50'};border:1px solid rgba(85,80,77,0.2);border-radius:16px;font-size:11px;cursor:pointer;font-family:'Noto Sans JP',sans-serif">${flaggedIds.has(q.id)?'🔖 フラグ済み':'🤔 難しかった'}</button>
     ${(()=>{const s=srsData[q.id];if(!s)return'';const due=new Date(s.due);const today2=new Date(todayKey);const diff=Math.round((due-today2)/(1000*60*60*24));const label=diff<=0?'今日':diff===1?'明日':`${diff}日後（${s.due.slice(5)}）`;return`<span style="font-size:10px;color:#8A6A50;padding:4px 8px;background:rgba(240,232,222,0.6);border-radius:10px;white-space:nowrap">📅 次回SRS: ${label}</span>`;})()}
     ${elapsedSec>=0.5?`<span style="font-size:10px;color:#8A6A50;padding:4px 8px;background:rgba(240,232,222,0.6);border-radius:10px;white-space:nowrap">⏱ ${elapsedSec}秒${(()=>{const avg=getAvgTime(q.id);return avg?` (平均${avg}秒)`:''})()}</span>`:''}
+    <button onclick="shareQuestion(${q.id})" style="padding:4px 9px;background:rgba(240,232,222,0.7);border:1px solid rgba(217,197,178,0.4);border-radius:10px;font-size:10px;color:#8A6A50;cursor:pointer;font-family:'Noto Sans JP',sans-serif;white-space:nowrap">📤 問題をシェア</button>
   </div>
   `;
   choices.after(res);
@@ -2750,6 +2796,17 @@ let weakFilter='all';
 let weakSearchText='';
 let weakSort='wrong';
 let hideMastered=false;
+function shareQuestion(id){
+  const q=QUESTIONS.find(x=>x.id===id);
+  if(!q) return;
+  const choices=Object.entries(q.choices).map(([k,v])=>`${k}. ${v}`).join('\n');
+  const text=`【NursePass 練習問題 #${id}】\n${q.category} ▸ ${q.field.replace('必修・','').replace('一般・','').replace('状況設定・','')}\n\n${q.question}\n\n${choices}\n\n正解: ${q.answer}. ${q.choices[q.answer]}\n\n📚 NursePass で看護師国試対策\nhttps://yunoa091224.github.io/nursepass/`;
+  if(navigator.share){
+    navigator.share({title:'NursePass 練習問題',text}).catch(()=>{});
+  } else {
+    navigator.clipboard.writeText(text).then(()=>showToast('問題をクリップボードにコピーしました'));
+  }
+}
 function showHint(){
   if(!session||session.idx>=session.pool.length) return;
   const q=session.pool[session.idx];
