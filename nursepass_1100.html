@@ -2085,6 +2085,56 @@ function renderStats(){
     <div class="result-label2">解答${answered}問 / 学習済み${total}問（カバー率${coverPct2}%）</div>
     <div style="display:flex;gap:8px;margin-top:12px">${catHtml}</div>
     ${weekChart}
+    ${(()=>{
+      // レーダーチャート: 8大分野の正答率
+      const radarGroups=[
+        {label:'基礎看護',keys:['基礎看護','必修・基礎看護学','看護技術','感染管理','必修・感染管理']},
+        {label:'成人看護',keys:['成人看護','疾患別看護','必修・成人看護学','救急・クリティカル','周手術期']},
+        {label:'老年看護',keys:['老年看護','必修・老年看護学','在宅看護','一般・在宅看護論']},
+        {label:'母性看護',keys:['母性看護','必修・母性看護学','母性・小児']},
+        {label:'小児看護',keys:['小児看護','必修・小児看護学']},
+        {label:'精神看護',keys:['精神看護','必修・精神看護学']},
+        {label:'社会保障',keys:['健康支援と社会保障制度','必修・健康支援と社会保障制度','看護の統合','一般・看護の統合と実践']},
+        {label:'人体構造',keys:['人体の構造と機能','必修・人体の構造と機能','一般・人体の構造と機能','一般・疾病の成り立ちと回復']},
+      ];
+      const scores=radarGroups.map(g=>{
+        const qs=QUESTIONS.filter(q=>g.keys.some(k=>q.field.includes(k.replace('必修・','').replace('一般・',''))||q.field===k));
+        const c=qs.reduce((s,q)=>{const h=history[String(q.id)];return s+(h?h.correct:0);},0);
+        const w=qs.reduce((s,q)=>{const h=history[String(q.id)];return s+(h?h.wrong:0);},0);
+        return{label:g.label,rate:c+w?Math.round(c/(c+w)*100):null,answered:c+w};
+      });
+      const answered=scores.filter(s=>s.answered>0);
+      if(answered.length<3) return '';
+      const N=scores.length;const R=70;const cx=100;const cy=100;
+      const pts=scores.map((s,i)=>{
+        const angle=(2*Math.PI*i/N)-Math.PI/2;
+        const r=s.rate!==null?R*(s.rate/100):0;
+        return{x:cx+r*Math.cos(angle),y:cy+r*Math.sin(angle),lx:cx+(R+18)*Math.cos(angle),ly:cy+(R+18)*Math.sin(angle)};
+      });
+      const axes=scores.map((_,i)=>{
+        const angle=(2*Math.PI*i/N)-Math.PI/2;
+        return `<line x1="${cx}" y1="${cy}" x2="${cx+R*Math.cos(angle)}" y2="${cy+R*Math.sin(angle)}" stroke="rgba(85,80,77,0.15)" stroke-width="1"/>`;
+      }).join('');
+      // Concentric rings at 25,50,75,100%
+      const rings=[25,50,75,100].map(pct=>{
+        const r2=R*(pct/100);
+        const rpts=scores.map((_,i)=>{const angle=(2*Math.PI*i/N)-Math.PI/2;return `${cx+r2*Math.cos(angle)},${cy+r2*Math.sin(angle)}`;}).join(' ');
+        return `<polygon points="${rpts}" fill="none" stroke="rgba(85,80,77,0.1)" stroke-width="0.8"/>`;
+      }).join('');
+      const polygon=`<polygon points="${pts.map(p=>`${p.x},${p.y}`).join(' ')}" fill="rgba(184,160,144,0.25)" stroke="#B8907A" stroke-width="1.5" stroke-linejoin="round"/>`;
+      const dots=pts.map((p,i)=>scores[i].answered>0?`<circle cx="${p.x}" cy="${p.y}" r="3" fill="${scores[i].rate>=70?'#16a34a':scores[i].rate>=50?'#D9A060':'#ef4444'}"/>`:'').join('');
+      const labels=scores.map((s,i)=>{
+        const p=pts[i];const anchor=p.lx<cx-5?'end':p.lx>cx+5?'start':'middle';
+        const color=s.rate===null?'#aaa':s.rate>=70?'#16a34a':s.rate>=50?'#D9A060':'#ef4444';
+        return `<text x="${p.lx}" y="${p.ly}" text-anchor="${anchor}" dominant-baseline="central" font-size="8" fill="${color}" font-weight="700" font-family="sans-serif">${s.label}${s.rate!==null?` ${s.rate}%`:''}</text>`;
+      }).join('');
+      return `<div style="text-align:left;margin-top:12px">
+        <div class="cat-stat-header">▸ 分野レーダーチャート</div>
+        <div style="display:flex;justify-content:center;margin-top:8px">
+          <svg viewBox="0 0 200 200" width="200" height="200" style="overflow:visible">${rings}${axes}${polygon}${dots}${labels}</svg>
+        </div>
+      </div>`;
+    })()}
     ${fieldStats.length>=2?`<div style="text-align:left;margin-top:12px">
       <div class="cat-stat-header">▸ 分野ランキング</div>
       <div style="display:flex;gap:8px;margin-top:6px">
