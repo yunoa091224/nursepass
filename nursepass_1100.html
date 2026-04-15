@@ -474,6 +474,22 @@ const ACHIEVEMENTS=[
 let earnedBadges=JSON.parse(localStorage.getItem('np_badges')||'[]');
 let mockHistory=JSON.parse(localStorage.getItem('np_mock_history')||'[]');
 let flashProgress=JSON.parse(localStorage.getItem('np_flash_progress')||'{}');
+// SRS: {id: {due:'YYYY-MM-DD', interval:1, easeFactor:2.5}}
+let srsData=JSON.parse(localStorage.getItem('np_srs')||'{}');
+function srsUpdate(id, correct){
+  const s=srsData[id]||{interval:1,easeFactor:2.5,due:todayKey};
+  const ef=Math.max(1.3, s.easeFactor+(correct?0.1:-0.2));
+  const iv=correct?Math.max(1,Math.round(s.interval*(correct?ef:0.5))):1;
+  const due=new Date();due.setDate(due.getDate()+iv);
+  srsData[id]={interval:iv,easeFactor:ef,due:due.toISOString().slice(0,10)};
+  // 保持数制限: 最大3000件
+  const keys=Object.keys(srsData);
+  if(keys.length>3000){const sorted=keys.sort((a,b)=>srsData[a].due.localeCompare(srsData[b].due));sorted.slice(0,keys.length-3000).forEach(k=>delete srsData[k]);}
+  localStorage.setItem('np_srs',JSON.stringify(srsData));
+}
+function getSrsDueIds(){
+  return Object.keys(srsData).filter(id=>srsData[id].due<=todayKey).map(Number);
+}
 function checkAchievements(){
   const answered=Object.values(history).reduce((s,h)=>s+h.correct+h.wrong,0);
   const correct=Object.values(history).reduce((s,h)=>s+h.correct,0);
@@ -979,6 +995,8 @@ function initModeButtons(){
   const tw=todayWrong.ids.length;
   const todayWrongBtn=tw>0?`<button class="mode-btn" onclick="startQuiz('today_wrong')" style="border-color:rgba(248,113,113,0.4);background:rgba(255,235,235,0.9)"><div class="mode-icon">🔄</div><div class="mode-title">今日の復習(${tw}問)</div><div class="mode-desc">今日間違えた問題</div></button>`:'';
   const timeAtkBtn=`<button class="mode-btn" onclick="startQuiz('timeatk')" style="border-color:rgba(234,179,8,0.4);background:rgba(254,249,195,0.9)"><div class="mode-icon">⏱</div><div class="mode-title">タイムアタック</div><div class="mode-desc">1問30秒×10問</div></button>`;
+  const srsDue=getSrsDueIds().length;
+  const srsBtn=srsDue>0?`<button class="mode-btn" onclick="startQuiz('srs')" style="border-color:rgba(124,58,237,0.4);background:rgba(245,240,255,0.9)"><div class="mode-icon">🧠</div><div class="mode-title">SRS復習(${srsDue}問)</div><div class="mode-desc">今日が期限の反復復習</div></button>`:'';
   if(currentCategory==='必修'){
     mg.innerHTML=`
       <button class="mode-btn" onclick="startQuiz('random')"><div class="mode-icon">🎲</div><div class="mode-title">ランダム5問</div><div class="mode-desc">まずここから</div></button>
@@ -987,7 +1005,7 @@ function initModeButtons(){
       ${unreadBtn}
       ${stars3Btn}
       ${timeAtkBtn}
-      ${todayWrongBtn}
+      ${todayWrongBtn}\n      ${srsBtn}
       <button class="mode-btn" onclick="startQuiz('allcat')"><div class="mode-icon">🏃</div><div class="mode-title">100問一気</div><div class="mode-desc">本番形式</div></button>
       <button class="mode-btn" onclick="startQuiz('hisshu')" style="border-color:rgba(217,197,178,0.5);background:rgba(237,224,212,0.9);grid-column:1/-1"><div class="mode-icon">⭐</div><div class="mode-title">必修50問 本番形式</div><div class="mode-desc">合格ライン80%（40/50問）で合否判定</div></button>
       <button class="mode-btn" onclick="showFlashCards()" style="border-color:rgba(184,160,144,0.5);background:linear-gradient(135deg,rgba(245,239,232,0.95),rgba(237,224,212,0.9));grid-column:1/-1"><div class="mode-icon">🃏</div><div class="mode-title">暗記カード</div><div class="mode-desc">検査値・薬物・看護技術など60枚</div></button>
@@ -1001,7 +1019,7 @@ function initModeButtons(){
       ${unreadBtn}
       ${stars3Btn}
       ${timeAtkBtn}
-      ${todayWrongBtn}
+      ${todayWrongBtn}\n      ${srsBtn}
       <button class="mode-btn" onclick="startQuiz('allcat')"><div class="mode-icon">🏃</div><div class="mode-title">100問一気</div><div class="mode-desc">本番形式</div></button>
       <button class="mode-btn" onclick="startQuiz('ippan50')" style="border-color:rgba(217,197,178,0.5);background:rgba(237,224,212,0.9);grid-column:1/-1"><div class="mode-icon">📚</div><div class="mode-title">一般問題 50問演習</div><div class="mode-desc">11分野からバランスよく出題</div></button>
       <button class="mode-btn" onclick="showFlashCards()" style="border-color:rgba(184,160,144,0.5);background:linear-gradient(135deg,rgba(245,239,232,0.95),rgba(237,224,212,0.9));grid-column:1/-1"><div class="mode-icon">🃏</div><div class="mode-title">暗記カード</div><div class="mode-desc">検査値・薬物・看護技術など60枚</div></button>
@@ -1015,7 +1033,7 @@ function initModeButtons(){
       ${unreadBtn}
       ${stars3Btn}
       ${timeAtkBtn}
-      ${todayWrongBtn}
+      ${todayWrongBtn}\n      ${srsBtn}
       <button class="mode-btn" onclick="startQuiz('allcat')"><div class="mode-icon">🏃</div><div class="mode-title">全問一気</div><div class="mode-desc">本番形式</div></button>
       <button class="mode-btn" onclick="startJokyoMode()" style="border-color:rgba(5,150,105,0.5);background:rgba(230,255,245,0.9);grid-column:1/-1"><div class="mode-icon">📋</div><div class="mode-title">状況設定 専用モード</div><div class="mode-desc">事例を1問ずつ、丁寧に解く</div></button>
       <button class="mode-btn" onclick="showFlashCards()" style="border-color:rgba(184,160,144,0.5);background:linear-gradient(135deg,rgba(245,239,232,0.95),rgba(237,224,212,0.9));grid-column:1/-1"><div class="mode-icon">🃏</div><div class="mode-title">暗記カード</div><div class="mode-desc">検査値・薬物・看護技術など60枚</div></button>
@@ -1054,6 +1072,11 @@ function startQuiz(mode){
   else if(mode==='today_wrong'){
     pool=shuffle(todayWrong.ids.map(id=>QUESTIONS.find(x=>x.id===id)).filter(Boolean));
     if(!pool.length){alert('今日間違えた問題はまだありません！\n素晴らしいです！');return;}
+  }
+  else if(mode==='srs'){
+    const dueIds=new Set(getSrsDueIds());
+    pool=shuffle(QUESTIONS.filter(q=>dueIds.has(q.id))).slice(0,20);
+    if(!pool.length){alert('今日の復習問題はありません。\n新しい問題を解いてから利用してください！');return;}
   }
   else if(mode==='timeatk'){
     pool=shuffle([...catQ]).slice(0,10);
@@ -1170,6 +1193,7 @@ function answer(key){
   if(!history[q.id]) history[q.id]={correct:0,wrong:0};
   if(correct) history[q.id].correct++;
   else {history[q.id].wrong++;if(!todayWrong.ids.includes(q.id))todayWrong.ids.push(q.id);saveTodayWrong();}
+  srsUpdate(q.id, correct);
   save();
   updateScoreBadge();
   updateDailyStats();
@@ -1669,7 +1693,7 @@ function renderStats(){
         </div>
       </div>`;
     })()}
-    <button onclick="if(confirm('記録をすべてリセットしますか？')){localStorage.removeItem('np_history');localStorage.removeItem('np_streak');localStorage.removeItem('np_weekly');localStorage.removeItem('np_badges');localStorage.removeItem('np_today_wrong');localStorage.removeItem('np_mock_history');localStorage.removeItem('np_flash_progress');history={};streakData={lastDate:'',streak:0};weeklyData={};earnedBadges=[];mockHistory=[];flashProgress={};updateScoreBadge();renderStats();renderHomeSummary();}" style="margin-top:20px;background:none;border:none;color:#5A5450;font-size:11px;cursor:pointer;font-family:'Noto Sans JP',sans-serif">記録をリセット</button>`;
+    <button onclick="if(confirm('記録をすべてリセットしますか？')){localStorage.removeItem('np_history');localStorage.removeItem('np_streak');localStorage.removeItem('np_weekly');localStorage.removeItem('np_badges');localStorage.removeItem('np_today_wrong');localStorage.removeItem('np_mock_history');localStorage.removeItem('np_flash_progress');localStorage.removeItem('np_srs');history={};streakData={lastDate:'',streak:0};weeklyData={};earnedBadges=[];mockHistory=[];flashProgress={};srsData={};updateScoreBadge();renderStats();renderHomeSummary();}" style="margin-top:20px;background:none;border:none;color:#5A5450;font-size:11px;cursor:pointer;font-family:'Noto Sans JP',sans-serif">記録をリセット</button>`;
 }
 
 
