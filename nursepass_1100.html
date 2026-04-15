@@ -216,6 +216,8 @@ body{min-height:100vh;background:linear-gradient(135deg,#F5EFE8 0%,#EDE0D0 50%,#
 .bm-btn{background:none;border:none;cursor:pointer;font-size:18px;padding:4px 8px;border-radius:8px;transition:.15s;line-height:1}
 .bm-btn:hover{background:rgba(217,197,178,0.2)}
 .memo-btn{background:none;border:none;cursor:pointer;font-size:15px;padding:4px 6px;border-radius:8px;transition:.15s;line-height:1;color:#8A7060}
+.tts-btn{padding:5px 10px;border:1.5px solid rgba(217,197,178,.4);border-radius:20px;background:rgba(240,232,222,.7);font-size:11px;font-weight:700;color:#6B5040;cursor:pointer;font-family:'Noto Sans JP',sans-serif;transition:.2s;display:inline-flex;align-items:center;gap:4px}
+.tts-btn:hover{background:rgba(217,197,178,.5)}
 .memo-btn:hover{background:rgba(217,197,178,0.2)}
 .memo-modal{position:fixed;inset:0;z-index:400;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,0.45);animation:fadein .2s ease}
 .memo-inner{background:#fff;border-radius:22px 22px 0 0;padding:20px 20px 32px;width:100%;max-width:480px;box-shadow:0 -4px 24px rgba(0,0,0,0.15)}
@@ -530,6 +532,10 @@ let earnedBadges=JSON.parse(localStorage.getItem('np_badges')||'[]');
 let mockHistory=JSON.parse(localStorage.getItem('np_mock_history')||'[]');
 let flashProgress=JSON.parse(localStorage.getItem('np_flash_progress')||'{}');
 let memoData=JSON.parse(localStorage.getItem('np_memos')||'{}');
+// モード別ベストスコア: {mode: {rate, correct, total, date}}
+let bestScores=JSON.parse(localStorage.getItem('np_best')||'{}');
+// 日別正答率: {date: {correct, total}}
+let dailyAccuracy=JSON.parse(localStorage.getItem('np_daily_acc')||'{}');
 // SRS: {id: {due:'YYYY-MM-DD', interval:1, easeFactor:2.5}}
 let srsData=JSON.parse(localStorage.getItem('np_srs')||'{}');
 // デイリーチャレンジ: {date:'YYYY-MM-DD', correct:0, total:0, done:false}
@@ -685,6 +691,44 @@ function pulseSummaryCard(id){
   el.closest('.summary-card')?.classList.remove('pulse');
   void el.closest('.summary-card')?.offsetWidth; // reflow
   el.closest('.summary-card')?.classList.add('pulse');
+}
+// ===== TTS（音声読み上げ）=====
+let ttsActive=false;
+function speakText(text){
+  if(!window.speechSynthesis) return;
+  speechSynthesis.cancel();
+  if(ttsActive){ttsActive=false;return;}
+  const utt=new SpeechSynthesisUtterance(text.replace(/<[^>]+>/g,''));
+  utt.lang='ja-JP';utt.rate=0.88;utt.pitch=1.0;
+  utt.onstart=()=>{ttsActive=true;};
+  utt.onend=()=>{ttsActive=false;updateTtsBtn(false);};
+  utt.onerror=()=>{ttsActive=false;};
+  speechSynthesis.speak(utt);
+  updateTtsBtn(true);
+}
+function updateTtsBtn(active){
+  document.querySelectorAll('.tts-btn').forEach(b=>{b.textContent=active?'⏹ 停止':'🔊 読み上げ';b.style.opacity=active?'0.7':'1';});
+}
+function stopTts(){speechSynthesis.cancel();ttsActive=false;updateTtsBtn(false);}
+// ===== ベストスコア保存 =====
+function saveBestScore(mode, rate, correct, total){
+  if(total<5) return; // 短すぎるセッションは除外
+  const prev=bestScores[mode];
+  if(!prev||rate>prev.rate){
+    bestScores[mode]={rate,correct,total,date:todayKey};
+    localStorage.setItem('np_best',JSON.stringify(bestScores));
+    if(prev) showToast(`🏆 ${getModeLabel(mode)} 自己ベスト更新！${rate}%`);
+  }
+  // 日別正答率を記録
+  if(!dailyAccuracy[todayKey]) dailyAccuracy[todayKey]={correct:0,total:0};
+  dailyAccuracy[todayKey].correct+=correct;
+  dailyAccuracy[todayKey].total+=total;
+  const daKeys=Object.keys(dailyAccuracy).sort();
+  while(daKeys.length>60){delete dailyAccuracy[daKeys.shift()];}
+  localStorage.setItem('np_daily_acc',JSON.stringify(dailyAccuracy));
+}
+function getModeLabel(mode){
+  return{random:'ランダム',field:'分野別',weak:'苦手強化',hisshu:'必修50問',ippan50:'一般50問',timeatk:'タイムアタック',mock:'模擬試験',daily:'デイリー',srs:'SRS復習',allcat:'100問一気',drill:'1問解説'}[mode]||mode;
 }
 // 今日の間違い・1日目標
 let todayWrong = JSON.parse(localStorage.getItem('np_today_wrong')||'{"date":"","ids":[]}');
@@ -1494,6 +1538,9 @@ function answer(key){
   <div style="font-size:12px;color:${correct?'#166534':'#B8A090'};font-weight:600;margin:4px 0 6px;padding:4px 8px;background:${correct?'rgba(74,222,128,0.08)':'rgba(217,197,178,0.08)'};border-radius:8px">${nmsg}</div>
   <div class="explanation">${q.explanation}</div>
   ${hasMemo?`<div style="margin-top:8px;padding:8px 10px;background:rgba(217,185,80,0.1);border-left:3px solid #D9A060;border-radius:6px;font-size:12px;color:#5A4420">📝 <strong>マイメモ：</strong>${memoData[q.id]}</div>`:''}
+  <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
+    ${window.speechSynthesis?`<button class="tts-btn" onclick="speakText('${(q.question+' 正解は'+q.choices[q.answer]+' 解説: '+q.explanation).replace(/'/g,'&apos;')}')">🔊 読み上げ</button>`:''}
+  </div>
   `;
   choices.after(res);
   const mc=createMiniChat(q);
@@ -1608,12 +1655,13 @@ function finishQuiz(){
       <div class="result-msg">${msg}</div>
       ${fieldBreakdown}
       <button class="result-retry" onclick="retrySession()">もう一度やる</button>
-      <button class="result-home" onclick="backHome()">ホームへ戻る</button>
+      <button class="result-home" onclick="stopTts();backHome()">ホームへ戻る</button>
       <button onclick="shareResult(${rate},${total},${session.correct})" style="width:100%;padding:12px;background:rgba(59,130,246,0.1);color:#1d4ed8;border:1.5px solid rgba(59,130,246,0.3);border-radius:14px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;margin-bottom:8px">📤 結果をシェア</button>
       <button class="cal-btn" onclick="showCalModal('NursePass 看護師国試 学習', '正解率 ${rate}% (${total}問中${session.correct}問正解)')">📅 次の学習をカレンダーに追加</button>
     </div>
   </div>`;
   updateScoreBadge();
+  saveBestScore(session.mode, rate, session.correct, total);
 }
 
 function showCalModal(defaultTitle, defaultDetails) {
@@ -1697,6 +1745,7 @@ function retrySession(){
 }
 
 function backHome(){
+  stopTts();
   document.getElementById('quizArea').style.display='none';
   document.getElementById('jokyoArea').style.display='none';
   document.getElementById('flashArea').style.display='none';
@@ -1948,6 +1997,59 @@ function renderStats(){
         </div>`).join('')}</div>
     </div>
     ${(()=>{
+      // 日別正答率トレンド（14日間折れ線）
+      const daKeys=Object.keys(dailyAccuracy).sort().slice(-14);
+      if(daKeys.length<2) return '';
+      const maxPct=100;
+      const h=48;
+      const w=daKeys.length*24;
+      const pts=daKeys.map((k,i)=>{
+        const d=dailyAccuracy[k];
+        const pct=d.total?Math.round(d.correct/d.total*100):0;
+        const x=i*(w/(daKeys.length-1)||0);
+        const y=h-(pct/maxPct*h);
+        return{x,y,pct,k};
+      });
+      const path=pts.map((p,i)=>`${i===0?'M':'L'}${p.x},${p.y}`).join(' ');
+      const area=`M${pts[0].x},${h} ${pts.map(p=>`L${p.x},${p.y}`).join(' ')} L${pts[pts.length-1].x},${h} Z`;
+      const dots=pts.map(p=>`<circle cx="${p.x}" cy="${p.y}" r="3" fill="#B8907A" title="${p.k}: ${p.pct}%"/>`).join('');
+      return `<div style="text-align:left;margin-top:12px">
+        <div class="cat-stat-header" style="display:flex;justify-content:space-between">
+          <span>▸ 正答率トレンド（最近${daKeys.length}日）</span>
+          <span style="font-size:10px;color:#8A6A50;font-weight:400">最新: ${pts[pts.length-1].pct}%</span>
+        </div>
+        <div style="background:rgba(240,232,222,.4);border-radius:10px;padding:8px;overflow-x:auto">
+          <svg width="${Math.max(w,200)}" height="${h+20}" style="display:block">
+            <defs><linearGradient id="accGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#D9C5B2" stop-opacity="0.4"/><stop offset="100%" stop-color="#D9C5B2" stop-opacity="0"/></linearGradient></defs>
+            <path d="${area}" fill="url(#accGrad)"/>
+            <path d="${path}" fill="none" stroke="#B8907A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            ${dots}
+            ${pts.filter((_,i)=>i===0||i===pts.length-1||pts[i].pct===Math.max(...pts.map(p=>p.pct))).map(p=>`<text x="${p.x}" y="${p.y-6}" text-anchor="middle" font-size="8" fill="#6B5040">${p.pct}%</text>`).join('')}
+          </svg>
+          <div style="display:flex;justify-content:space-between;font-size:9px;color:#8A6A50;margin-top:2px"><span>${daKeys[0].slice(5)}</span><span>${daKeys[daKeys.length-1].slice(5)}</span></div>
+        </div>
+      </div>`;
+    })()}
+    ${(()=>{
+      // ベストスコア一覧
+      const modes=Object.keys(bestScores);
+      if(!modes.length) return '';
+      const rows=modes.sort().map(m=>{
+        const b=bestScores[m];
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;margin-bottom:4px;background:rgba(240,232,222,.5);border-radius:10px;border:1px solid rgba(85,80,77,0.12)">
+          <div>
+            <div style="font-size:12px;font-weight:700;color:#5A5450">${getModeLabel(m)}</div>
+            <div style="font-size:10px;color:#8A6A50">${b.correct}/${b.total}問 · ${b.date}</div>
+          </div>
+          <div style="font-size:18px;font-weight:800;color:#B8907A">${b.rate}%</div>
+        </div>`;
+      }).join('');
+      return `<div style="text-align:left;margin-top:12px">
+        <div class="cat-stat-header">▸ モード別 自己ベスト</div>
+        ${rows}
+      </div>`;
+    })()}
+    ${(()=>{
       if(!mockHistory.length) return '';
       const rows=mockHistory.slice(0,10).map(r=>{
         const passColor=r.pass?'#16a34a':'#991b1b';
@@ -1996,7 +2098,7 @@ function renderStats(){
         </div>
       </div>`;
     })()}
-    <button onclick="if(confirm('記録をすべてリセットしますか？')){localStorage.removeItem('np_history');localStorage.removeItem('np_streak');localStorage.removeItem('np_weekly');localStorage.removeItem('np_badges');localStorage.removeItem('np_today_wrong');localStorage.removeItem('np_mock_history');localStorage.removeItem('np_flash_progress');localStorage.removeItem('np_srs');localStorage.removeItem('np_daily');localStorage.removeItem('np_memos');history={};streakData={lastDate:'',streak:0};weeklyData={};earnedBadges=[];mockHistory=[];flashProgress={};srsData={};dailyChallenge=null;memoData={};updateScoreBadge();renderStats();renderHomeSummary();}" style="margin-top:20px;background:none;border:none;color:#5A5450;font-size:11px;cursor:pointer;font-family:'Noto Sans JP',sans-serif">記録をリセット</button>`;
+    <button onclick="if(confirm('記録をすべてリセットしますか？')){localStorage.removeItem('np_history');localStorage.removeItem('np_streak');localStorage.removeItem('np_weekly');localStorage.removeItem('np_badges');localStorage.removeItem('np_today_wrong');localStorage.removeItem('np_mock_history');localStorage.removeItem('np_flash_progress');localStorage.removeItem('np_srs');localStorage.removeItem('np_daily');localStorage.removeItem('np_memos');localStorage.removeItem('np_best');localStorage.removeItem('np_daily_acc');history={};streakData={lastDate:'',streak:0};weeklyData={};earnedBadges=[];mockHistory=[];flashProgress={};srsData={};dailyChallenge=null;memoData={};bestScores={};dailyAccuracy={};updateScoreBadge();renderStats();renderHomeSummary();}" style="margin-top:20px;background:none;border:none;color:#5A5450;font-size:11px;cursor:pointer;font-family:'Noto Sans JP',sans-serif">記録をリセット</button>`;
 }
 
 
