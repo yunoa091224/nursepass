@@ -608,6 +608,7 @@ const ACHIEVEMENTS=[
 ];
 let earnedBadges=JSON.parse(localStorage.getItem('np_badges')||'[]');
 let mockHistory=JSON.parse(localStorage.getItem('np_mock_history')||'[]');
+let sessionLog=JSON.parse(localStorage.getItem('np_session_log')||'[]');
 let flashProgress=JSON.parse(localStorage.getItem('np_flash_progress')||'{}');
 let memoData=JSON.parse(localStorage.getItem('np_memos')||'{}');
 // モード別ベストスコア: {mode: {rate, correct, total, date}}
@@ -2545,6 +2546,7 @@ function initModeButtons(){
       <button class="mode-btn" onclick="startQuiz('allcat')"><div class="mode-icon">🏃</div><div class="mode-title">100問一気</div><div class="mode-desc">本番形式</div></button>
       <button class="mode-btn" onclick="startQuiz('hisshu')" style="border-color:rgba(217,197,178,0.5);background:rgba(237,224,212,0.9);grid-column:1/-1"><div class="mode-icon">⭐</div><div class="mode-title">必修50問 本番形式</div><div class="mode-desc">合格ライン80%（40/50問）で合否判定</div></button>
       <button class="mode-btn" onclick="startQuiz('lastmin')" style="border-color:rgba(239,68,68,0.4);background:linear-gradient(135deg,rgba(254,226,226,0.9),rgba(255,215,215,0.85));grid-column:1/-1"><div class="mode-icon">🚨</div><div class="mode-title">試験直前モード</div><div class="mode-desc">未克服の頻出問題＋SRS期限問題を最大30問</div></button>
+      <button class="mode-btn" onclick="startQuiz('adaptive')" style="border-color:rgba(59,130,246,0.4);background:linear-gradient(135deg,rgba(219,234,254,0.9),rgba(191,219,254,0.85));grid-column:1/-1"><div class="mode-icon">🧩</div><div class="mode-title">アダプティブモード</div><div class="mode-desc">正答率30〜70%の「伸び代ゾーン」問題を自動選出</div></button>
       <button class="mode-btn" onclick="startQuiz('streak10')" style="border-color:rgba(234,179,8,0.4);background:linear-gradient(135deg,rgba(253,230,138,0.25),rgba(250,204,21,0.15));grid-column:1/-1"><div class="mode-icon">🔥</div><div class="mode-title">10連続正解チャレンジ</div><div class="mode-desc">1問でも間違えたらゲームオーバー！10問連続正解を目指せ</div></button>
       ${flaggedIds.size>0?`<button class="mode-btn" onclick="startQuiz('flagged')" style="border-color:rgba(239,68,68,0.3);background:linear-gradient(135deg,rgba(255,237,213,0.9),rgba(254,215,170,0.85));grid-column:1/-1"><div class="mode-icon">🔖</div><div class="mode-title">難問特訓（${flaggedIds.size}問）</div><div class="mode-desc">フラグを付けた難しかった問題だけ</div></button>`:''}
       ${Object.keys(bookmarks).length>0?`<button class="mode-btn" onclick="startQuiz('bookmark')" style="border-color:rgba(59,130,246,0.3);background:linear-gradient(135deg,rgba(219,234,254,0.9),rgba(191,219,254,0.85));grid-column:1/-1"><div class="mode-icon">🔖</div><div class="mode-title">ブックマーク演習（${Object.keys(bookmarks).length}問）</div><div class="mode-desc">ブックマーク済みの問題を出題</div></button>`:''}
@@ -2563,6 +2565,7 @@ function initModeButtons(){
       <button class="mode-btn" onclick="startQuiz('allcat')"><div class="mode-icon">🏃</div><div class="mode-title">100問一気</div><div class="mode-desc">本番形式</div></button>
       <button class="mode-btn" onclick="startQuiz('ippan50')" style="border-color:rgba(217,197,178,0.5);background:rgba(237,224,212,0.9);grid-column:1/-1"><div class="mode-icon">📚</div><div class="mode-title">一般問題 50問演習</div><div class="mode-desc">11分野からバランスよく出題</div></button>
       <button class="mode-btn" onclick="startQuiz('lastmin')" style="border-color:rgba(239,68,68,0.4);background:linear-gradient(135deg,rgba(254,226,226,0.9),rgba(255,215,215,0.85));grid-column:1/-1"><div class="mode-icon">🚨</div><div class="mode-title">試験直前モード</div><div class="mode-desc">未克服の頻出問題＋SRS期限問題を最大30問</div></button>
+      <button class="mode-btn" onclick="startQuiz('adaptive')" style="border-color:rgba(59,130,246,0.4);background:linear-gradient(135deg,rgba(219,234,254,0.9),rgba(191,219,254,0.85));grid-column:1/-1"><div class="mode-icon">🧩</div><div class="mode-title">アダプティブモード</div><div class="mode-desc">正答率30〜70%の「伸び代ゾーン」問題を自動選出</div></button>
       <button class="mode-btn" onclick="startQuiz('streak10')" style="border-color:rgba(234,179,8,0.4);background:linear-gradient(135deg,rgba(253,230,138,0.25),rgba(250,204,21,0.15));grid-column:1/-1"><div class="mode-icon">🔥</div><div class="mode-title">10連続正解チャレンジ</div><div class="mode-desc">1問でも間違えたらゲームオーバー！10問連続正解を目指せ</div></button>
       ${flaggedIds.size>0?`<button class="mode-btn" onclick="startQuiz('flagged')" style="border-color:rgba(239,68,68,0.3);background:linear-gradient(135deg,rgba(255,237,213,0.9),rgba(254,215,170,0.85));grid-column:1/-1"><div class="mode-icon">🔖</div><div class="mode-title">難問特訓（${flaggedIds.size}問）</div><div class="mode-desc">フラグを付けた難しかった問題だけ</div></button>`:''}
       ${Object.keys(bookmarks).length>0?`<button class="mode-btn" onclick="startQuiz('bookmark')" style="border-color:rgba(59,130,246,0.3);background:linear-gradient(135deg,rgba(219,234,254,0.9),rgba(191,219,254,0.85));grid-column:1/-1"><div class="mode-icon">🔖</div><div class="mode-title">ブックマーク演習（${Object.keys(bookmarks).length}問）</div><div class="mode-desc">ブックマーク済みの問題を出題</div></button>`:''}
@@ -2581,6 +2584,7 @@ function initModeButtons(){
       <button class="mode-btn" onclick="startQuiz('allcat')"><div class="mode-icon">🏃</div><div class="mode-title">全問一気</div><div class="mode-desc">本番形式</div></button>
       <button class="mode-btn" onclick="startJokyoMode()" style="border-color:rgba(5,150,105,0.5);background:rgba(230,255,245,0.9);grid-column:1/-1"><div class="mode-icon">📋</div><div class="mode-title">状況設定 専用モード</div><div class="mode-desc">事例を1問ずつ、丁寧に解く</div></button>
       <button class="mode-btn" onclick="startQuiz('lastmin')" style="border-color:rgba(239,68,68,0.4);background:linear-gradient(135deg,rgba(254,226,226,0.9),rgba(255,215,215,0.85));grid-column:1/-1"><div class="mode-icon">🚨</div><div class="mode-title">試験直前モード</div><div class="mode-desc">未克服の頻出問題＋SRS期限問題を最大30問</div></button>
+      <button class="mode-btn" onclick="startQuiz('adaptive')" style="border-color:rgba(59,130,246,0.4);background:linear-gradient(135deg,rgba(219,234,254,0.9),rgba(191,219,254,0.85));grid-column:1/-1"><div class="mode-icon">🧩</div><div class="mode-title">アダプティブモード</div><div class="mode-desc">正答率30〜70%の「伸び代ゾーン」問題を自動選出</div></button>
       <button class="mode-btn" onclick="startQuiz('streak10')" style="border-color:rgba(234,179,8,0.4);background:linear-gradient(135deg,rgba(253,230,138,0.25),rgba(250,204,21,0.15));grid-column:1/-1"><div class="mode-icon">🔥</div><div class="mode-title">10連続正解チャレンジ</div><div class="mode-desc">1問でも間違えたらゲームオーバー！10問連続正解を目指せ</div></button>
       ${flaggedIds.size>0?`<button class="mode-btn" onclick="startQuiz('flagged')" style="border-color:rgba(239,68,68,0.3);background:linear-gradient(135deg,rgba(255,237,213,0.9),rgba(254,215,170,0.85));grid-column:1/-1"><div class="mode-icon">🔖</div><div class="mode-title">難問特訓（${flaggedIds.size}問）</div><div class="mode-desc">フラグを付けた難しかった問題だけ</div></button>`:''}
       ${Object.keys(bookmarks).length>0?`<button class="mode-btn" onclick="startQuiz('bookmark')" style="border-color:rgba(59,130,246,0.3);background:linear-gradient(135deg,rgba(219,234,254,0.9),rgba(191,219,254,0.85));grid-column:1/-1"><div class="mode-icon">🔖</div><div class="mode-title">ブックマーク演習（${Object.keys(bookmarks).length}問）</div><div class="mode-desc">ブックマーク済みの問題を出題</div></button>`:''}
@@ -2696,6 +2700,22 @@ function startQuiz(mode){
     // 10連続正解チャレンジ: 全問からランダム、1問でも誤答でゲームオーバー
     pool=shuffle([...QUESTIONS]).slice(0,50); // 最大50問をバッファとして用意
     session={pool,idx:0,correct:0,wrong:0,mode:'streak10',streakTarget:10,currentStreak:0};
+    showQuiz();
+    return;
+  }
+  else if(mode==='adaptive'){
+    // アダプティブモード: 正答率30〜70%の「伸び代ゾーン」問題を優先
+    const challenging=QUESTIONS.filter(q=>{
+      const h=history[String(q.id)];
+      if(!h||h.correct+h.wrong<2) return false;
+      const acc=h.correct/(h.correct+h.wrong);
+      return acc>=0.25&&acc<=0.75;
+    });
+    const fresh=QUESTIONS.filter(q=>!history[String(q.id)]&&q.stars>=2);
+    const mixed=shuffle([...challenging,...shuffle(fresh).slice(0,5)]).slice(0,20);
+    if(!mixed.length){showToast('アダプティブモードに十分な解答データがまだありません。もっと問題を解いてね。');return;}
+    session={pool:mixed,idx:0,correct:0,wrong:0,mode:'adaptive'};
+    showToast(`🎯 アダプティブモード: 伸び代ゾーンの${mixed.length}問`);
     showQuiz();
     return;
   }
@@ -3306,6 +3326,12 @@ function finishQuiz(){
   recordStudyTime();
   updateScoreBadge();
   saveBestScore(session.mode, rate, session.correct, total);
+  // セッションログ保存
+  if(total>=3){
+    sessionLog.unshift({date:todayKey,mode:session.mode,rate,correct:session.correct,total,combo:session.combo||0});
+    if(sessionLog.length>30) sessionLog=sessionLog.slice(0,30);
+    localStorage.setItem('np_session_log',JSON.stringify(sessionLog));
+  }
 }
 
 function showCalModal(defaultTitle, defaultDetails) {
@@ -3735,9 +3761,12 @@ function renderWeak(){
     const wc=wrongChoices[q.id]||{};
     const topWrong=Object.entries(wc).sort((a,b)=>b[1]-a[1])[0];
     const trapLine=topWrong&&!isMastered?`<div style="font-size:10px;color:#9B4A3A;margin-top:3px;padding:2px 6px;background:rgba(239,68,68,0.07);border-radius:5px;border-left:2px solid rgba(239,68,68,0.3)">⚠️ よく選ぶ誤答: <strong>${topWrong[0]}. ${(q.choices[topWrong[0]]||'').slice(0,24)}${(q.choices[topWrong[0]]||'').length>24?'…':''}</strong>（${topWrong[1]}回）</div>`:'';
+    // 克服まであとN回バッジ: isMastered条件 = correct>=3 && correct>=wrong*3
+    const needForMastery=!isMastered?(()=>{const need=Math.max(3,h.wrong*3)-h.correct;return need>0?need:1;})():0;
+    const masteryBadge=!isMastered&&needForMastery<=5?`<span style="display:inline-block;margin-left:4px;padding:1px 5px;background:rgba(59,130,246,0.12);border-radius:6px;font-size:9px;color:#1d4ed8;font-weight:700">あと${needForMastery}回で克服</span>`:'';
     return `<div class="weak-item" onclick="drillOne(${q.id})" style="${isMastered?'border-color:rgba(74,222,128,0.35);background:rgba(74,222,128,0.06)':''}">
       <div class="weak-q">${bm}${q.question}</div>
-      <div class="weak-meta">${q.category} ▸ ${q.field} ▸ 間違え${h.wrong}回 / 正解${h.correct}回 ${isMastered?'<span style="color:#16a34a;font-weight:700">✓ 克服</span>':''}${srsBadge}</div>
+      <div class="weak-meta">${q.category} ▸ ${q.field} ▸ 間違え${h.wrong}回 / 正解${h.correct}回 ${isMastered?'<span style="color:#16a34a;font-weight:700">✓ 克服</span>':''}${srsBadge}${masteryBadge}</div>
       ${trapLine}${memo}
     </div>`;
   }).join('');
@@ -3918,6 +3947,25 @@ function renderMockHistoryChart(){
   </div>`;
 }
 // 分野別強弱ランキング
+// セッション履歴ログ
+function renderSessionLog(){
+  if(sessionLog.length<3) return '';
+  const modeLabel={random:'ランダム',field:'分野別',weak:'苦手強化',hisshu:'必修50問',ippan50:'一般50問',timeatk:'タイムアタック',mock:'模擬試験',daily:'デイリー',srs:'SRS復習',allcat:'100問',drill:'1問',lastmin:'試験直前',flagged:'難問',streak10:'10連続',minimock:'ミニ模擬',adaptive:'アダプティブ'};
+  const rows=sessionLog.slice(0,15).map(s=>{
+    const col=s.rate>=80?'#16a34a':s.rate>=60?'#D9A060':'#ef4444';
+    const bar=`<div style="height:4px;background:rgba(237,224,212,0.4);border-radius:4px;overflow:hidden;margin-top:3px"><div style="width:${s.rate}%;height:100%;background:${col};border-radius:4px"></div></div>`;
+    const comboTxt=s.combo>=3?`<span style="font-size:9px;color:#f59e0b;margin-left:4px">🔥${s.combo}</span>`:'';
+    return `<div style="padding:5px 0;border-bottom:1px solid rgba(217,197,178,0.2);display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center">
+      <span style="font-size:9px;color:#A09080;white-space:nowrap">${s.date.slice(5)}</span>
+      <div><span style="font-size:10px;color:#6B5040">${modeLabel[s.mode]||s.mode} ${s.total}問</span>${comboTxt}${bar}</div>
+      <span style="font-size:12px;font-weight:700;color:${col};white-space:nowrap">${s.rate}%</span>
+    </div>`;
+  }).join('');
+  return `<div style="margin-bottom:14px;padding:12px 14px;background:rgba(245,239,232,0.85);border:1.5px solid rgba(217,197,178,0.4);border-radius:14px">
+    <div style="font-size:11px;font-weight:700;color:#B8907A;margin-bottom:8px">📋 学習履歴（直近${Math.min(sessionLog.length,15)}回）</div>
+    ${rows}
+  </div>`;
+}
 // 自己記録ボード
 function renderPersonalRecords(){
   const answered=Object.values(history).reduce((s,h)=>s+h.correct+h.wrong,0);
@@ -4928,6 +4976,7 @@ function renderStats(){
     ${renderSpeedRanking()}
     ${renderTopMissed()}
     ${renderFieldRanking()}
+    ${renderSessionLog()}
     ${renderPersonalRecords()}
     ${renderAccTrend()}
     <div style="margin:12px 0;padding:12px 14px;background:rgba(240,232,222,0.5);border:1.5px solid rgba(217,197,178,0.35);border-radius:14px;text-align:center">
