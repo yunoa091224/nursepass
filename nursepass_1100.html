@@ -348,6 +348,7 @@ body.font-xl .explanation{font-size:15px}
       <div class="summary-card"><div class="summary-val" id="streakDisp">0</div><div class="summary-lbl">🔥 連続学習日</div></div>
       <div class="summary-card"><div class="summary-val" id="todayDisp">0</div><div class="summary-lbl">📝 今日の問題数</div></div>
       <div class="summary-card"><div class="summary-val" id="coverDisp">0%</div><div class="summary-lbl">✅ カバー率</div></div>
+      <div class="summary-card"><div class="summary-val" id="studyTimeDisp" style="font-size:16px">0分</div><div class="summary-lbl">⏱ 今日の学習時間</div></div>
       <div class="summary-card" style="grid-column:1/-1;background:linear-gradient(135deg,rgba(245,239,232,0.9),rgba(237,224,212,0.8))"><div class="summary-val" id="passScoreDisp" style="font-size:22px">--</div><div class="summary-lbl">🎯 合格予測スコア<span class="pass-lbl-sub" style="display:block;font-size:9px;margin-top:2px"></span></div></div>
     </div>
     <div style="text-align:center;font-size:12px;margin-bottom:10px" id="examCountdown"></div>
@@ -1005,6 +1006,8 @@ function renderHomeSummary(){
   if(sd) sd.textContent=streak;
   if(td) td.textContent=today;
   if(cd) cd.textContent=coverPct+'%';
+  const tm=document.getElementById('studyTimeDisp');
+  if(tm){const mins=(dailyAccuracy[todayKey]&&dailyAccuracy[todayKey].mins)||0;tm.textContent=mins>=60?`${Math.floor(mins/60)}時間${mins%60}分`:mins+'分';}
   // 合格予測スコア
   const ps=calcPassScore();
   const pe=document.getElementById('passScoreDisp');
@@ -1464,7 +1467,9 @@ function startPractice(spec){
 }
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 
+let sessionStartTime=0;
 function showQuiz(){
+  sessionStartTime=Date.now();
   document.getElementById('tabHome').style.display='none';
   document.getElementById('tabWeak').style.display='none';
   document.getElementById('tabStats').style.display='none';
@@ -1472,6 +1477,15 @@ function showQuiz(){
   const qa=document.getElementById('quizArea');
   qa.style.display='block';
   renderQuestion();
+}
+function recordStudyTime(){
+  if(!sessionStartTime) return;
+  const mins=Math.round((Date.now()-sessionStartTime)/60000);
+  sessionStartTime=0;
+  if(mins<1) return;
+  if(!dailyAccuracy[todayKey]) dailyAccuracy[todayKey]={correct:0,total:0};
+  dailyAccuracy[todayKey].mins=(dailyAccuracy[todayKey].mins||0)+mins;
+  localStorage.setItem('np_daily_acc',JSON.stringify(dailyAccuracy));
 }
 
 let timerInterval=null;
@@ -1757,6 +1771,7 @@ function finishQuiz(){
       <button class="cal-btn" onclick="showCalModal('NursePass 看護師国試 学習', '正解率 ${rate}% (${total}問中${session.correct}問正解)')">📅 次の学習をカレンダーに追加</button>
     </div>
   </div>`;
+  recordStudyTime();
   updateScoreBadge();
   saveBestScore(session.mode, rate, session.correct, total);
 }
@@ -1849,6 +1864,7 @@ function retryWrong(){
 }
 
 function backHome(){
+  recordStudyTime();
   stopTts();
   document.getElementById('quizArea').style.display='none';
   document.getElementById('jokyoArea').style.display='none';
@@ -2234,7 +2250,7 @@ function renderStats(){
       return `<div style="text-align:left;margin-top:12px">
         <div class="cat-stat-header" style="display:flex;justify-content:space-between">
           <span>▸ 正答率トレンド（最近${daKeys.length}日）</span>
-          <span style="font-size:10px;color:#8A6A50;font-weight:400">最新: ${pts[pts.length-1].pct}%</span>
+          <span style="font-size:10px;color:#8A6A50;font-weight:400">${(()=>{const totalMins=Object.values(dailyAccuracy).reduce((s,d)=>s+(d.mins||0),0);return totalMins?`⏱ 累計${totalMins>=60?Math.floor(totalMins/60)+'h'+totalMins%60+'m':totalMins+'分'}`:'';})()}</span>
         </div>
         <div style="background:rgba(240,232,222,.4);border-radius:10px;padding:8px;overflow-x:auto">
           <svg width="${Math.max(w,200)}" height="${h+20}" style="display:block">
