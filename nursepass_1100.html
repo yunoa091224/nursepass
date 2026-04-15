@@ -394,6 +394,12 @@ body.font-xl .explanation{font-size:15px}
         <input type="search" id="weakSearchInput" placeholder="🔍 キーワードで問題を検索..." oninput="onWeakSearch(this.value)"
           style="width:100%;box-sizing:border-box;padding:8px 12px;border:1.5px solid rgba(85,80,77,0.2);border-radius:10px;background:rgba(255,252,248,0.8);font-size:13px;font-family:'Noto Sans JP',sans-serif;color:#4A3828;outline:none">
       </div>
+      <div style="padding:0 16px 4px;display:flex;gap:4px;align-items:center">
+        <span style="font-size:10px;color:#8A6A50">並び替え：</span>
+        <button class="chip selected" id="weakSortWrong" onclick="setWeakSort('wrong')" style="font-size:10px;padding:3px 8px">間違え多い順</button>
+        <button class="chip" id="weakSortAcc" onclick="setWeakSort('acc')" style="font-size:10px;padding:3px 8px">正答率低い順</button>
+        <button class="chip" id="weakSortStreak" onclick="setWeakSort('streak')" style="font-size:10px;padding:3px 8px">未克服優先</button>
+      </div>
       <div id="weakSummaryBar" style="padding:0 16px 8px;font-size:11px;color:#8A6A50"></div>
       <div class="weak-list" id="weakList"></div>
     </div>
@@ -1890,6 +1896,15 @@ function backHome(){
 // WEAK LIST
 let weakFilter='all';
 let weakSearchText='';
+let weakSort='wrong';
+function setWeakSort(s){
+  weakSort=s;
+  ['wrong','acc','streak'].forEach(k=>{
+    const btn=document.getElementById('weakSort'+(k==='wrong'?'Wrong':k==='acc'?'Acc':'Streak'));
+    if(btn) btn.classList.toggle('selected',k===s);
+  });
+  renderWeak();
+}
 function setWeakFilter(f){
   weakFilter=f;
   ['all','必修','一般','状況設定','bookmark','memo'].forEach(k=>{
@@ -1970,7 +1985,13 @@ function renderWeak(){
   if(weakFilter!=='all'){
     weakIds=allWeak.filter(id=>{const q=QUESTIONS.find(x=>x.id==id);return q&&q.category===weakFilter;});
   }
-  weakIds.sort((a,b)=>history[b].wrong-history[a].wrong);
+  if(weakSort==='acc'){
+    weakIds.sort((a,b)=>{const ha=history[a],hb=history[b];const ra=ha.correct/(ha.correct+ha.wrong);const rb=hb.correct/(hb.correct+hb.wrong);return ra-rb;});
+  } else if(weakSort==='streak'){
+    weakIds.sort((a,b)=>{const ha=history[a],hb=history[b];const ma=ha.correct>ha.wrong?1:0;const mb=hb.correct>hb.wrong?1:0;if(ma!==mb) return ma-mb;return hb.wrong-ha.wrong;});
+  } else {
+    weakIds.sort((a,b)=>history[b].wrong-history[a].wrong);
+  }
   const memoCount=Object.keys(memoData).length;
   if(sb) sb.innerHTML=allWeak.length?`苦手問題 <strong style="color:#B8907A">${allWeak.length}</strong>問 ／ 克服済み <strong style="color:#16a34a">${mastered}</strong>問 ／ 🔖${bmCount}問${memoCount?` ／ 📝${memoCount}件`:''}`:'';
   if(wb) wb.style.display=weakIds.length?'block':'none';
