@@ -188,10 +188,15 @@ body{min-height:100vh;background:linear-gradient(135deg,#F5EFE8 0%,#EDE0D0 50%,#
 .cal-cancel{width:100%;padding:10px;background:transparent;color:#aaa;border:none;font-size:13px;cursor:pointer;margin-top:4px;font-family:'Noto Sans JP',sans-serif}
 .cal-home-btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:13px;background:rgba(66,133,244,0.08);color:#3367D6;border:1.5px solid rgba(66,133,244,0.2);border-radius:14px;font-size:14px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;margin-top:12px;font-weight:600;grid-column:1/-1}
 /* ホームサマリー */
-.home-summary{display:flex;gap:8px;margin-bottom:12px}
-.summary-card{flex:1;background:rgba(255,255,255,0.88);border:1px solid rgba(85,80,77,0.15);border-radius:14px;padding:10px 6px;text-align:center}
+.home-summary{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px}
+.summary-card{background:rgba(255,255,255,0.88);border:1px solid rgba(85,80,77,0.15);border-radius:14px;padding:10px 6px;text-align:center;transition:.3s}
 .summary-val{font-size:20px;font-weight:700;color:#B8907A;line-height:1.1}
 .summary-lbl{font-size:9px;color:#5A5450;margin-top:3px}
+.summary-card.pulse{animation:summaryPulse .6s ease}
+@keyframes summaryPulse{0%{transform:scale(1)}50%{transform:scale(1.05);box-shadow:0 0 20px rgba(217,185,80,0.4)}100%{transform:scale(1)}}
+/* 紙吹雪 */
+.confetti-piece{position:fixed;width:8px;height:8px;border-radius:2px;pointer-events:none;z-index:9999;animation:confettiFall 2s ease-in forwards}
+@keyframes confettiFall{0%{opacity:1;transform:translateY(-20px) rotate(0deg)}100%{opacity:0;transform:translateY(100vh) rotate(720deg)}}
 /* 週間グラフ */
 .week-chart{display:flex;gap:4px;align-items:flex-end;height:54px;padding:0 2px}
 .week-bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px}
@@ -348,7 +353,7 @@ body.font-xl .explanation{font-size:15px}
     <div style="background:rgba(255,255,255,0.85);border:1px solid rgba(85,80,77,0.15);border-radius:14px;padding:10px 14px;margin-bottom:10px" id="goalBar"></div>
     <div class="search-wrap">
       <span style="font-size:16px;color:#aaa">🔍</span>
-      <input class="search-input" id="searchInput" placeholder="問題を検索（キーワードで絞り込み）" oninput="onSearchInput(this.value)" autocomplete="off">
+      <input class="search-input" id="searchInput" placeholder="キーワード検索 / #123でID直接検索" oninput="onSearchInput(this.value)" autocomplete="off">
       <button onclick="clearSearch()" style="background:none;border:none;color:#aaa;font-size:14px;cursor:pointer;padding:2px 4px;display:none" id="searchClear">✕</button>
     </div>
     <div class="search-results" id="searchResults"></div>
@@ -658,6 +663,29 @@ function showToast(msg){
   document.body.appendChild(el);
   toastTimer=setTimeout(()=>el.remove(),3000);
 }
+function launchConfetti(){
+  const colors=['#D9C5B2','#B8907A','#4ade80','#f59e0b','#60a5fa','#f472b6','#a78bfa'];
+  for(let i=0;i<40;i++){
+    setTimeout(()=>{
+      const p=document.createElement('div');
+      p.className='confetti-piece';
+      p.style.left=Math.random()*100+'vw';
+      p.style.top='-10px';
+      p.style.background=colors[Math.floor(Math.random()*colors.length)];
+      p.style.animationDuration=(1.5+Math.random())+'s';
+      p.style.animationDelay=(Math.random()*0.5)+'s';
+      document.body.appendChild(p);
+      setTimeout(()=>p.remove(),2500);
+    },i*30);
+  }
+}
+function pulseSummaryCard(id){
+  const el=document.getElementById(id);
+  if(!el) return;
+  el.closest('.summary-card')?.classList.remove('pulse');
+  void el.closest('.summary-card')?.offsetWidth; // reflow
+  el.closest('.summary-card')?.classList.add('pulse');
+}
 // 今日の間違い・1日目標
 let todayWrong = JSON.parse(localStorage.getItem('np_today_wrong')||'{"date":"","ids":[]}');
 if(todayWrong.date!==todayKey) todayWrong={date:todayKey,ids:[]};
@@ -669,12 +697,16 @@ function setDailyGoal(){
   if(!n||n<5||n>100){return;}
   dailyGoal=n;localStorage.setItem('np_goal',n);renderGoalBar();renderNoaCard();
 }
+let _lastGoalDone=false;
 function renderGoalBar(){
   const el=document.getElementById('goalBar');
   if(!el) return;
   const today=weeklyData[todayKey]||0;
   const pct=Math.min(Math.round(today/dailyGoal*100),100);
   const done=today>=dailyGoal;
+  // 初めて達成した瞬間に紙吹雪
+  if(done&&!_lastGoalDone){launchConfetti();showToast('🎉 今日の目標達成！素晴らしい！');}
+  _lastGoalDone=done;
   el.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
     <span style="font-size:11px;color:#8A6A50;font-weight:600">📌 今日の目標 <span style="cursor:pointer;text-decoration:underline" onclick="setDailyGoal()">${dailyGoal}問</span></span>
     <span style="font-size:11px;color:${done?'#16a34a':'#B8907A'};font-weight:700">${today}/${dailyGoal}問 ${done?'✓ 達成！':''}</span>
@@ -776,13 +808,20 @@ function updateDailyStats(){
   if(streakData.lastDate!==todayKey){
     const yest=new Date();yest.setDate(yest.getDate()-1);
     const yKey=yest.toISOString().slice(0,10);
+    const prevStreak=streakData.streak;
     if(streakData.lastDate===yKey) streakData.streak+=1;
     else streakData.streak=1;
     streakData.lastDate=todayKey;
+    // ストリーク節目でトースト
+    const milestones=[3,7,14,30,60,100];
+    if(milestones.includes(streakData.streak)){
+      setTimeout(()=>{showToast(`🔥 ${streakData.streak}日連続！すごい！`);if(streakData.streak>=7)launchConfetti();},500);
+    }
   }
   localStorage.setItem('np_weekly',JSON.stringify(weeklyData));
   localStorage.setItem('np_streak',JSON.stringify(streakData));
   renderHomeSummary();
+  pulseSummaryCard('todayDisp');
 }
 
 let searchTimer=null;
@@ -797,16 +836,30 @@ function onSearchInput(val){
 function doSearch(q){
   const sr=document.getElementById('searchResults');
   if(!sr) return;
+  // ID検索: "#123" または "id:123"
+  const idMatch=q.match(/^#?id:?(\d+)$|^#(\d+)$/i);
+  if(idMatch){
+    const id=parseInt(idMatch[1]||idMatch[2]);
+    const found=QUESTIONS.find(x=>x.id===id);
+    if(found){
+      sr.innerHTML=`<div class="search-item" onclick="drillOne(${found.id})">
+        <div class="search-q">ID:${found.id} ${found.question}</div>
+        <div class="search-meta">${found.category} ▸ ${found.field}</div>
+      </div>`;
+      sr.style.display='block'; return;
+    }
+  }
   const kws=q.toLowerCase().split(/\s+/);
-  const results=QUESTIONS.filter(x=>kws.every(k=>x.question.includes(k)||x.field.includes(k))).slice(0,20);
+  const results=QUESTIONS.filter(x=>kws.every(k=>x.question.includes(k)||x.field.includes(k)||x.explanation.includes(k))).slice(0,20);
   if(!results.length){sr.innerHTML='<div style="padding:12px 14px;color:#aaa;font-size:13px">見つかりませんでした</div>';sr.style.display='block';return;}
   sr.innerHTML=results.map(x=>{
     const h=history[String(x.id)];
     const bm=bookmarks[x.id]?'🔖':'';
+    const memo=memoData[x.id]?'📝':'';
     const acc=h?(h.correct+h.wrong?Math.round(h.correct/(h.correct+h.wrong)*100)+'%':'--'):'未解答';
     return `<div class="search-item" onclick="drillOne(${x.id})">
-      <div class="search-q">${bm} ${x.question}</div>
-      <div class="search-meta">${x.category} ▸ ${x.field} ▸ 正答率：${acc}</div>
+      <div class="search-q">${bm}${memo} ${x.question}</div>
+      <div class="search-meta">ID:${x.id} ▸ ${x.category} ▸ ${x.field} ▸ ${acc}</div>
     </div>`;
   }).join('');
   sr.style.display='block';
