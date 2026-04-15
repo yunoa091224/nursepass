@@ -400,6 +400,12 @@ body.font-xl .explanation{font-size:15px}
         <button class="chip" id="weakFilterhard" onclick="setWeakFilter('tag_hard')">🔴難解</button>
         <button class="chip" id="weakFilterreview" onclick="setWeakFilter('tag_review')">🔵復習</button>
       </div>
+      <div style="padding:0 16px 6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <div style="font-size:11px;color:#6B5040;font-weight:700;margin-right:4px">頻出度：</div>
+        <button class="chip" id="weakFilterstars3" onclick="setWeakFilter('stars3')" style="font-size:11px">★★★ 最頻出</button>
+        <button class="chip" id="weakFilterstars2" onclick="setWeakFilter('stars2')" style="font-size:11px">★★ 頻出</button>
+        <button class="chip" id="weakFilterstars1" onclick="setWeakFilter('stars1')" style="font-size:11px">★ 標準</button>
+      </div>
       <div style="padding:0 16px 8px">
         <input type="search" id="weakSearchInput" placeholder="🔍 キーワードで問題を検索..." oninput="onWeakSearch(this.value)"
           style="width:100%;box-sizing:border-box;padding:8px 12px;border:1.5px solid rgba(85,80,77,0.2);border-radius:10px;background:rgba(255,252,248,0.8);font-size:13px;font-family:'Noto Sans JP',sans-serif;color:#4A3828;outline:none">
@@ -1966,7 +1972,7 @@ function deleteCustomCard(cid){
   showToast('カードを削除しました');
 }
 
-let flashState = {cat:'すべて', idx:0, flipped:false, onlyAgain:false};
+let flashState = {cat:'すべて', idx:0, flipped:false, onlyAgain:false, shuffled:false, shuffledPool:null};
 const FLASH_CATS = ['すべて','マイカード','検査値','薬物副作用','看護技術','感染管理','疾患・病態','周手術期','母性・小児','老年・在宅','精神看護'];
 
 function showFlashCards(){
@@ -1993,12 +1999,25 @@ function getFlashPool(){
   if(flashState.onlyAgain){
     pool=pool.filter(c=>flashProgress[c.q]==='again'||!flashProgress[c.q]);
   }
+  if(flashState.shuffled){
+    if(!flashState.shuffledPool||flashState.shuffledPool.length!==pool.length){
+      flashState.shuffledPool=[...pool].sort(()=>Math.random()-0.5);
+    }
+    return flashState.shuffledPool;
+  }
+  flashState.shuffledPool=null;
   return pool;
 }
 function toggleFlashAgainMode(){
   flashState.onlyAgain=!flashState.onlyAgain;
-  flashState.idx=0;flashState.flipped=false;
+  flashState.idx=0;flashState.flipped=false;flashState.shuffledPool=null;
   renderFlash();
+}
+function toggleFlashShuffle(){
+  flashState.shuffled=!flashState.shuffled;
+  flashState.idx=0;flashState.flipped=false;flashState.shuffledPool=null;
+  renderFlash();
+  showToast(flashState.shuffled?'シャッフルON':'シャッフルOFF');
 }
 
 function renderFlash(){
@@ -2015,6 +2034,7 @@ function renderFlash(){
       <div style="font-size:13px;font-weight:700;color:#6B5040">暗記カード</div>
       <div style="display:flex;align-items:center;gap:6px">
         <button onclick="toggleFlashAgainMode()" style="padding:3px 8px;background:${flashState.onlyAgain?'rgba(248,113,113,0.2)':'rgba(240,232,222,0.8)'};border:1px solid rgba(217,197,178,0.5);border-radius:12px;font-size:10px;font-weight:700;color:${flashState.onlyAgain?'#dc2626':'#8A6A50'};cursor:pointer;font-family:'Noto Sans JP',sans-serif">${flashState.onlyAgain?'🔴苦手のみ':'🔄苦手特訓'}</button>
+        <button onclick="toggleFlashShuffle()" style="padding:3px 8px;background:${flashState.shuffled?'rgba(59,130,246,0.2)':'rgba(240,232,222,0.8)'};border:1px solid rgba(217,197,178,0.5);border-radius:12px;font-size:10px;font-weight:700;color:${flashState.shuffled?'#1d4ed8':'#8A6A50'};cursor:pointer;font-family:'Noto Sans JP',sans-serif">🔀 シャッフル</button>
         <button onclick="openAddCardModal()" style="padding:3px 8px;background:rgba(139,92,246,0.15);border:1px solid rgba(139,92,246,0.4);border-radius:12px;font-size:10px;font-weight:700;color:#7c3aed;cursor:pointer;font-family:'Noto Sans JP',sans-serif">＋ 追加</button>
         <div style="font-size:11px;color:#8A7060">${idx+1} / ${pool.length}</div>
       </div>
@@ -2066,6 +2086,7 @@ function flashSetCat(cat){
   flashState.idx=0;
   flashState.flipped=false;
   flashState.search='';
+  flashState.shuffledPool=null;
   renderFlash();
 }
 
@@ -2917,6 +2938,10 @@ function setWeakFilter(f){
     const btn=document.getElementById('weakFilter'+k);
     if(btn) btn.classList.toggle('selected',f==='tag_'+k);
   });
+  ['stars3','stars2','stars1'].forEach(k=>{
+    const btn=document.getElementById('weakFilter'+k);
+    if(btn) btn.classList.toggle('selected',f===k);
+  });
   renderWeak();
 }
 function onWeakSearch(val){
@@ -2955,6 +2980,28 @@ function renderWeak(){
   const mastered=allWeak.filter(id=>history[id].correct>history[id].wrong).length;
   const bmCount=Object.keys(bookmarks).length;
   let items=[];
+  if(weakFilter&&weakFilter.startsWith('stars')){
+    const starNum=parseInt(weakFilter.slice(5));
+    const starItems=QUESTIONS.filter(q=>q.stars===starNum).map(q=>{const h=history[String(q.id)];return {id:String(q.id),q,h};});
+    const label=starNum===3?'★★★ 最頻出':starNum===2?'★★ 頻出':'★ 標準';
+    if(sb) sb.innerHTML=`${label} <strong style="color:#B8907A">${starItems.length}</strong>問`;
+    if(wb) wb.style.display=starItems.length?'block':'none';
+    if(!starItems.length){wl.innerHTML=`<div class="empty">${label}の問題はありません。</div>`;return;}
+    const sorted=starItems.sort((a,b)=>{
+      const ra=a.h&&(a.h.correct+a.h.wrong)?a.h.correct/(a.h.correct+a.h.wrong):0.5;
+      const rb=b.h&&(b.h.correct+b.h.wrong)?b.h.correct/(b.h.correct+b.h.wrong):0.5;
+      return ra-rb;
+    });
+    wl.innerHTML=sorted.map(({id,q,h})=>{
+      const acc=h&&h.correct+h.wrong?Math.round(h.correct/(h.correct+h.wrong)*100)+'%':'未解答';
+      const col=!h?'#8A6A50':h.correct>h.wrong?'#16a34a':'#dc2626';
+      return `<div class="weak-item" onclick="drillOne(${q.id})">
+        <div class="weak-q">${'★'.repeat(starNum)} ${q.question}</div>
+        <div class="weak-meta">${q.field.replace('必修・','').replace('一般・','').replace('状況設定・','')} · <span style="color:${col};font-weight:600">正答率: ${acc}</span></div>
+      </div>`;
+    }).join('');
+    return;
+  }
   if(weakFilter&&weakFilter.startsWith('tag_')){
     const tagKey=weakFilter.slice(4);
     const tagDef=BM_TAG_DEFS[tagKey];
@@ -3155,6 +3202,36 @@ async function requestNoaAnalysis(){
     out.innerHTML=`<div style="font-size:11px;color:#dc2626">分析に失敗しました。もう一度お試しください。</div>`;
   }
   btn.disabled=false;btn.textContent='🌸 のあ先生に分析してもらう';
+}
+// 14日間正答率トレンドグラフ
+function renderAccTrend(){
+  const days=[];
+  for(let i=13;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);days.push(d.toISOString().slice(0,10));}
+  const pts=days.map(dt=>{const da=dailyAccuracy[dt];return da&&da.total>=3?Math.round(da.correct/da.total*100):null;});
+  const hasPts=pts.filter(p=>p!==null).length;
+  if(hasPts<2) return '';
+  const vals=pts.map(p=>p===null?0:p);
+  const maxV=Math.max(...pts.filter(p=>p!==null),100);
+  const barW=Math.floor(100/14);
+  const bars=vals.map((v,i)=>{
+    const p=pts[i];if(p===null) return `<div style="flex:1;display:flex;align-items:flex-end;justify-content:center"><div style="width:10px;height:2px;background:rgba(184,160,144,0.2);border-radius:2px"></div></div>`;
+    const h=Math.round((p/100)*56);
+    const col=p>=80?'rgba(74,222,128,0.8)':p>=60?'rgba(251,191,36,0.8)':'rgba(248,113,113,0.8)';
+    const label=days[i].slice(5);
+    return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:1px" title="${label}: ${p}%"><div style="font-size:8px;color:#8A7060;font-variant-numeric:tabular-nums">${p>0?p:''}</div><div style="width:10px;height:${h}px;background:${col};border-radius:2px 2px 0 0;min-height:2px"></div></div>`;
+  });
+  // pass line at 80%: top offset from bottom of chart = 80/100 * 56 = 44.8px
+  return `<div style="margin-bottom:14px;padding:12px 14px;background:linear-gradient(135deg,rgba(245,239,232,0.9),rgba(235,225,210,0.85));border:1.5px solid rgba(217,197,178,0.4);border-radius:14px">
+    <div style="font-size:11px;font-weight:700;color:#B8907A;margin-bottom:8px">📈 14日間正答率トレンド</div>
+    <div style="position:relative;height:72px;display:flex;align-items:flex-end;gap:1px;padding-bottom:12px">
+      <div style="position:absolute;bottom:12px;left:0;right:0;height:1px;background:rgba(239,68,68,0.4);border-top:1px dashed rgba(239,68,68,0.4)" title="合格ライン80%"></div>
+      <div style="position:absolute;bottom:56px;right:4px;font-size:8px;color:rgba(239,68,68,0.7)">80%</div>
+      ${bars.join('')}
+    </div>
+    <div style="display:flex;justify-content:space-between;font-size:9px;color:#B0A0924;margin-top:2px">
+      <span>${days[0].slice(5)}</span><span>今日</span>
+    </div>
+  </div>`;
 }
 // SRS 今後7日間の復習予定グラフ
 function renderSrsForecast(){
@@ -3783,6 +3860,7 @@ function renderStats(){
     ${renderSrsForecast()}
     ${renderPaceAnalysis()}
     ${renderTopMissed()}
+    ${renderAccTrend()}
     `;
 }
 
