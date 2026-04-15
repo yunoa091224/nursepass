@@ -349,13 +349,14 @@ body.font-xl .explanation{font-size:15px}
       <div class="summary-card"><div class="summary-val" id="todayDisp">0</div><div class="summary-lbl">📝 今日の問題数</div></div>
       <div class="summary-card"><div class="summary-val" id="coverDisp">0%</div><div class="summary-lbl">✅ カバー率</div></div>
       <div class="summary-card"><div class="summary-val" id="studyTimeDisp" style="font-size:16px">0分</div><div class="summary-lbl">⏱ 今日の学習時間</div></div>
-      <div class="summary-card" style="grid-column:1/-1;background:linear-gradient(135deg,rgba(245,239,232,0.9),rgba(237,224,212,0.8))"><div class="summary-val" id="passScoreDisp" style="font-size:22px">--</div><div class="summary-lbl">🎯 合格予測スコア<span class="pass-lbl-sub" style="display:block;font-size:9px;margin-top:2px"></span></div></div>
+      <div class="summary-card" onclick="showPassScoreDetail()" style="grid-column:1/-1;background:linear-gradient(135deg,rgba(245,239,232,0.9),rgba(237,224,212,0.8));cursor:pointer"><div class="summary-val" id="passScoreDisp" style="font-size:22px">--</div><div class="summary-lbl">🎯 合格予測スコア<span class="pass-lbl-sub" style="display:block;font-size:9px;margin-top:2px"></span></div><div id="passScoreBreakdown" style="display:none;margin-top:8px;text-align:left;font-size:10px"></div></div>
     </div>
     <div style="text-align:center;font-size:12px;margin-bottom:10px" id="examCountdown"></div>
     <div id="noaCard" style="margin-bottom:10px"></div>
     <div style="background:rgba(255,255,255,0.85);border:1px solid rgba(85,80,77,0.15);border-radius:14px;padding:10px 14px;margin-bottom:10px" id="goalBar"></div>
     <div id="pomodoroWidget" style="margin-bottom:10px"></div>
     <div id="todayPlanCard" style="margin-bottom:10px"></div>
+    <div id="questionOfDayCard" style="margin-bottom:10px"></div>
     <div class="search-wrap">
       <span style="font-size:16px;color:#aaa">🔍</span>
       <input class="search-input" id="searchInput" placeholder="キーワード検索 / #123でID直接検索" oninput="onSearchInput(this.value)" autocomplete="off">
@@ -849,6 +850,91 @@ function renderGoalBar(){
     <div style="width:${pct}%;height:100%;background:${done?'linear-gradient(90deg,#4ade80,#16a34a)':'linear-gradient(90deg,#D9C5B2,#B8A090)'};border-radius:10px;transition:.5s"></div>
   </div>`;
 }
+// 今日の1問カード（ホーム画面）
+let qodAnswered=JSON.parse(localStorage.getItem('np_qod')||'null');
+if(qodAnswered&&qodAnswered.date!==todayKey) qodAnswered=null;
+function renderQuestionOfDay(){
+  const el=document.getElementById('questionOfDayCard');
+  if(!el) return;
+  // Pick question seeded by date: prioritize unanswered stars≥2, else random
+  const dateNum=parseInt(todayKey.replace(/-/g,''));
+  const candidates=QUESTIONS.filter(q=>q.stars>=2&&!history[String(q.id)]);
+  const pool=candidates.length?candidates:QUESTIONS.filter(q=>q.stars>=2);
+  if(!pool.length){el.innerHTML='';return;}
+  const q=pool[dateNum%pool.length];
+  // If already answered today show result
+  if(qodAnswered&&qodAnswered.id===q.id){
+    const ok=qodAnswered.correct;
+    el.innerHTML=`<div style="padding:12px 14px;background:linear-gradient(135deg,rgba(245,239,232,0.9),rgba(237,224,212,0.8));border:1.5px solid rgba(217,197,178,0.4);border-radius:14px">
+      <div style="font-size:10px;font-weight:700;color:#B8907A;margin-bottom:6px">⭐ 今日の1問 <span style="font-weight:400;color:#aaa">（解答済み）</span></div>
+      <div style="font-size:12px;color:#55504D;font-weight:600;margin-bottom:6px">${q.question}</div>
+      <div style="font-size:11px;padding:6px 10px;background:${ok?'rgba(74,222,128,0.1)':'rgba(248,113,113,0.08)'};border-radius:8px;color:${ok?'#166534':'#991b1b'}">
+        ${ok?'✓ 正解！':'✗ 不正解'} 正解: <strong>${q.answer}. ${q.choices[q.answer]}</strong>
+      </div>
+      <div style="font-size:10px;color:#8A6A50;margin-top:6px;cursor:pointer" onclick="drillOne(${q.id})">→ もう一度解く</div>
+    </div>`;
+    return;
+  }
+  // Show question card (collapsed choices)
+  let revealed=false;
+  el.innerHTML=`<div style="padding:12px 14px;background:linear-gradient(135deg,rgba(245,239,232,0.9),rgba(237,224,212,0.8));border:1.5px solid rgba(217,197,178,0.4);border-radius:14px" id="qodInner">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <div style="font-size:10px;font-weight:700;color:#B8907A">⭐ 今日の1問</div>
+      <div style="font-size:9px;color:#aaa">${q.category} · ${q.field.replace('必修・','').replace('一般・','').replace('状況設定・','')}</div>
+    </div>
+    <div style="font-size:12px;color:#55504D;font-weight:600;margin-bottom:10px;line-height:1.5">${q.question}</div>
+    <div id="qodChoices" style="display:flex;flex-direction:column;gap:5px">
+      ${['A','B','C','D'].map(k=>`<button data-key="${k}" onclick="answerQod('${k}',${q.id})" style="padding:7px 10px;background:rgba(255,255,255,0.7);border:1px solid rgba(217,197,178,0.4);border-radius:10px;font-size:11px;color:#55504D;cursor:pointer;text-align:left;font-family:'Noto Sans JP',sans-serif;width:100%"><span style="font-weight:700;color:#B8907A">${k}.</span> ${q.choices[k]}</button>`).join('')}
+    </div>
+  </div>`;
+}
+function answerQod(key,qid){
+  const q=QUESTIONS.find(x=>x.id===qid);
+  if(!q) return;
+  const correct=key===q.answer;
+  qodAnswered={date:todayKey,id:qid,correct};
+  localStorage.setItem('np_qod',JSON.stringify(qodAnswered));
+  // Record in history
+  if(!history[qid]) history[qid]={correct:0,wrong:0};
+  if(correct) history[qid].correct++; else {history[qid].wrong++;if(!todayWrong.ids.includes(qid))todayWrong.ids.push(qid);saveTodayWrong();}
+  srsUpdate(qid,correct); save(); updateScoreBadge(); updateDailyStats(); renderGoalBar();
+  const inner=document.getElementById('qodInner');
+  if(!inner) return;
+  document.querySelectorAll('#qodChoices button').forEach(b=>{
+    b.disabled=true;
+    if(b.dataset.key===q.answer) b.style.background='rgba(74,222,128,0.2)';
+    else if(b.dataset.key===key&&!correct) b.style.background='rgba(248,113,113,0.15)';
+  });
+  const fb=document.createElement('div');
+  fb.style.cssText='margin-top:8px;padding:6px 10px;border-radius:8px;font-size:11px;font-weight:600;color:'+(correct?'#166534':'#991b1b')+';background:'+(correct?'rgba(74,222,128,0.1)':'rgba(248,113,113,0.08)');
+  fb.textContent=(correct?'✓ 正解！ ':'✗ 不正解 ')+'正解: '+q.answer+'. '+q.choices[q.answer];
+  inner.appendChild(fb);
+  const expBtn=document.createElement('div');
+  expBtn.style.cssText='margin-top:6px;font-size:10px;color:#8A6A50;cursor:pointer';
+  expBtn.textContent='→ 解説を見る';
+  expBtn.onclick=()=>drillOne(qid);
+  inner.appendChild(expBtn);
+}
+
+// 回答時間トラッカー
+let questionStartTime=0;
+let answerTimes=JSON.parse(localStorage.getItem('np_times')||'{}'); // {id: [ms,...]}
+function recordAnswerTime(id,ms){
+  if(!answerTimes[id]) answerTimes[id]=[];
+  answerTimes[id].push(ms);
+  if(answerTimes[id].length>5) answerTimes[id].shift(); // keep last 5
+  if(Object.keys(answerTimes).length>500){
+    const oldest=Object.keys(answerTimes)[0];
+    delete answerTimes[oldest];
+  }
+  localStorage.setItem('np_times',JSON.stringify(answerTimes));
+}
+function getAvgTime(id){
+  const t=answerTimes[id];
+  if(!t||!t.length) return null;
+  return Math.round(t.reduce((s,v)=>s+v,0)/t.length/1000*10)/10;
+}
+
 // 苦手分野クイック強化ボタン（ホーム画面）
 function renderWeakFieldQuick(){
   const el=document.getElementById('weakFieldQuick');
@@ -1306,6 +1392,40 @@ function clearSearch(){
   if(sr){sr.style.display='none';sr.innerHTML='';}
   if(cl) cl.style.display='none';
 }
+let passScoreOpen=false;
+function showPassScoreDetail(){
+  passScoreOpen=!passScoreOpen;
+  const el=document.getElementById('passScoreBreakdown');
+  if(!el) return;
+  if(!passScoreOpen){el.style.display='none';return;}
+  function catRate(cat){
+    const qs=QUESTIONS.filter(q=>q.category===cat);
+    const c=qs.reduce((s,q)=>{const h=history[String(q.id)];return s+(h?h.correct:0);},0);
+    const w=qs.reduce((s,q)=>{const h=history[String(q.id)];return s+(h?h.wrong:0);},0);
+    const cov=qs.filter(q=>history[String(q.id)]).length;
+    return{rate:c+w?Math.round(c/(c+w)*100):null,total:qs.length,done:cov};
+  }
+  const cats=[{label:'⭐ 必修',cat:'必修',pass:80,w:40},{label:'📚 一般',cat:'一般',pass:60,w:35},{label:'📋 状況設定',cat:'状況設定',pass:60,w:25}];
+  const rows=cats.map(({label,cat,pass,w})=>{
+    const {rate,total,done}=catRate(cat);
+    const pct=rate!==null?rate:0;
+    const ok=rate!==null&&rate>=pass;
+    const barW=Math.max(3,pct);
+    const barColor=ok?'rgba(74,222,128,0.7)':pct>=pass*0.8?'rgba(234,179,8,0.7)':'rgba(248,113,113,0.65)';
+    return `<div style="margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+        <span style="font-weight:700;color:#55504D">${label} <span style="font-weight:400;color:#aaa;font-size:9px">合格ライン${pass}%</span></span>
+        <span style="font-weight:700;color:${ok?'#16a34a':pct>=pass*0.8?'#d97706':'#dc2626'}">${rate!==null?rate+'%':'未解答'} <span style="font-weight:400;color:#aaa;font-size:9px">${done}/${total}</span></span>
+      </div>
+      <div style="position:relative;height:8px;background:rgba(237,224,212,0.4);border-radius:6px;overflow:visible">
+        <div style="width:${barW}%;height:100%;background:${barColor};border-radius:6px"></div>
+        <div style="position:absolute;left:${pass}%;top:-2px;height:12px;width:2px;background:rgba(22,163,74,0.6);border-radius:2px"></div>
+      </div>
+    </div>`;
+  }).join('');
+  el.style.display='block';
+  el.innerHTML=rows+`<div style="color:#8A6A50;font-size:9px;margin-top:4px;text-align:center">タップで閉じる · スコア = 必修×0.4+一般×0.35+状況×0.25</div>`;
+}
 function calcPassScore(){
   // 合格予測スコア: 必修正答率×0.4 + 一般正答率×0.35 + 状況設定正答率×0.25
   // 必修ライン80%未満で大幅減点
@@ -1721,6 +1841,7 @@ function endFlash(){
   renderExamCountdown();
   renderGoalBar();renderNoaCard();
   renderWeakFieldQuick();
+  renderQuestionOfDay();
   initModeButtons();
 }
 
@@ -2052,6 +2173,7 @@ function autoAnswerTimeout(){
 function renderQuestion(){
   clearQuizTimer();
   resetMiniChat();
+  questionStartTime=Date.now();
   const qa=document.getElementById('quizArea');
   const q=session.pool[session.idx];
   const total=session.pool.length;
@@ -2080,6 +2202,9 @@ function renderQuestion(){
 
 function answer(key){
   clearQuizTimer();
+  const elapsedMs=questionStartTime?Date.now()-questionStartTime:0;
+  const elapsedSec=Math.round(elapsedMs/100)/10;
+  if(questionStartTime&&elapsedMs>500&&elapsedMs<120000){recordAnswerTime(session.pool[session.idx].id,elapsedMs);}
   const q=session.pool[session.idx];
   const correct=key===q.answer;
   if(!history[q.id]) history[q.id]={correct:0,wrong:0};
@@ -2183,6 +2308,7 @@ function answer(key){
     ${window.speechSynthesis?`<button class="tts-btn" onclick="speakText('${(q.question+' 正解は'+q.choices[q.answer]+' 解説: '+q.explanation).replace(/'/g,'&apos;')}')">🔊 読み上げ</button>${renderTtsSpeedBtns()}`:''}
     <button id="flagBtn_${q.id}" onclick="flagQuestion(${q.id})" style="padding:5px 10px;background:${flaggedIds.has(q.id)?'rgba(239,68,68,0.12)':'rgba(240,232,222,0.8)'};color:${flaggedIds.has(q.id)?'#dc2626':'#8A6A50'};border:1px solid rgba(85,80,77,0.2);border-radius:16px;font-size:11px;cursor:pointer;font-family:'Noto Sans JP',sans-serif">${flaggedIds.has(q.id)?'🔖 フラグ済み':'🤔 難しかった'}</button>
     ${(()=>{const s=srsData[q.id];if(!s)return'';const due=new Date(s.due);const today2=new Date(todayKey);const diff=Math.round((due-today2)/(1000*60*60*24));const label=diff<=0?'今日':diff===1?'明日':`${diff}日後（${s.due.slice(5)}）`;return`<span style="font-size:10px;color:#8A6A50;padding:4px 8px;background:rgba(240,232,222,0.6);border-radius:10px;white-space:nowrap">📅 次回SRS: ${label}</span>`;})()}
+    ${elapsedSec>=0.5?`<span style="font-size:10px;color:#8A6A50;padding:4px 8px;background:rgba(240,232,222,0.6);border-radius:10px;white-space:nowrap">⏱ ${elapsedSec}秒${(()=>{const avg=getAvgTime(q.id);return avg?` (平均${avg}秒)`:''})()}</span>`:''}
   </div>
   `;
   choices.after(res);
