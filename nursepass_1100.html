@@ -2178,7 +2178,31 @@ function renderStats(){
   </div>`;
   const coverPct2=Math.round(total/QUESTIONS.length*100);
 
+  // 学習分析レポート
+  const analysisHtml=(()=>{
+    if(!answered) return '';
+    const weakestField=fieldStats[0];
+    const bestField=[...fieldStats].sort((a,b)=>b.rate-a.rate)[0];
+    const uncoveredPct=100-coverPct2;
+    const thisWeekQ=heatDays.slice(-7).reduce((s,d)=>s+d.cnt,0);
+    const avgPerDay=thisWeekQ?Math.round(thisWeekQ/7*10)/10:0;
+    const days=getExamDays();
+    const tips=[];
+    if(weakestField&&weakestField.rate!==null&&weakestField.rate<60) tips.push(`「${weakestField.label}」の正答率が${weakestField.rate}%と低めです。集中的に取り組みましょう。`);
+    if(uncoveredPct>50) tips.push(`まだ${uncoveredPct}%の問題が未解答です。「未解答10問」モードで新しい問題を探索しましょう。`);
+    else if(uncoveredPct>20) tips.push(`残り${uncoveredPct}%の未解答問題があります。着実にカバーを広げていきましょう。`);
+    const srsDue=getSrsDueIds().length;
+    if(srsDue>0) tips.push(`SRS復習が${srsDue}問溜まっています。忘れる前に復習しましょう。`);
+    if(days&&days>0&&days<=30) tips.push(`試験まで${days}日です。本番模擬試験で最終確認をしましょう。`);
+    if(!tips.length&&bestField&&bestField.rate>=80) tips.push(`「${bestField.label}」が得意分野です（${bestField.rate}%）。他の分野も同様に伸ばしていきましょう。`);
+    if(!tips.length) return '';
+    return `<div style="margin-bottom:14px;padding:12px 14px;background:linear-gradient(135deg,rgba(245,239,232,0.9),rgba(240,230,218,0.85));border:1.5px solid rgba(217,197,178,0.4);border-radius:14px;text-align:left">
+      <div style="font-size:11px;font-weight:700;color:#B8907A;margin-bottom:8px">🌸 のあ先生からのアドバイス</div>
+      ${tips.slice(0,2).map(t=>`<div style="font-size:12px;color:#4A3828;line-height:1.6;margin-bottom:4px;padding-left:8px;border-left:2px solid #D9C5B2">${t}</div>`).join('')}
+    </div>`;
+  })();
   sc.innerHTML=`
+    ${analysisHtml}
     <div class="result-big">${rate}%</div>
     <div class="result-label2">解答${answered}問 / 学習済み${total}問（カバー率${coverPct2}%）</div>
     <div style="display:flex;gap:8px;margin-top:12px">${catHtml}</div>
