@@ -349,11 +349,12 @@ body.font-xl .explanation{font-size:15px}
     <div class="home-summary">
       <div class="summary-card" onclick="showStreakDetail()"><div class="summary-val" id="streakDisp">0</div><div class="summary-lbl">🔥 連続学習日<span id="bestStreakLbl" style="display:block;font-size:9px;color:#aaa;margin-top:1px"></span></div></div>
       <div class="summary-card"><div class="summary-val" id="todayDisp">0</div><div class="summary-lbl">📝 今日の問題数</div></div>
-      <div class="summary-card"><div class="summary-val" id="coverDisp">0%</div><div class="summary-lbl">✅ カバー率</div></div>
+      <div class="summary-card" onclick="showCoverageModal()" style="cursor:pointer"><div class="summary-val" id="coverDisp">0%</div><div class="summary-lbl">✅ カバー率<span style="display:block;font-size:9px;color:#aaa;margin-top:1px">タップで内訳</span></div></div>
       <div class="summary-card"><div class="summary-val" id="studyTimeDisp" style="font-size:16px">0分</div><div class="summary-lbl">⏱ 今日の学習時間<span id="accDeltaDisp" style="display:block;margin-top:2px"></span></div></div>
       <div class="summary-card" onclick="showPassScoreDetail()" style="grid-column:1/-1;background:linear-gradient(135deg,rgba(245,239,232,0.9),rgba(237,224,212,0.8));cursor:pointer"><div class="summary-val" id="passScoreDisp" style="font-size:22px">--</div><div class="summary-lbl">🎯 合格予測スコア<span class="pass-lbl-sub" style="display:block;font-size:9px;margin-top:2px"></span></div><div id="passScoreBreakdown" style="display:none;margin-top:8px;text-align:left;font-size:10px"></div></div>
     </div>
     <div style="text-align:center;font-size:12px;margin-bottom:10px" id="examCountdown"></div>
+    <div id="passGaugeCard" style="margin-bottom:10px"></div>
     <div id="noaCard" style="margin-bottom:10px"></div>
     <div id="dailyTipCard" style="margin-bottom:10px"></div>
     <div style="background:rgba(255,255,255,0.85);border:1px solid rgba(85,80,77,0.15);border-radius:14px;padding:10px 14px;margin-bottom:10px" id="goalBar"></div>
@@ -1453,6 +1454,119 @@ function renderExamCountdown(){
   </div>`;
 }
 
+// 合格予測ゲージ（SVG半円アーク）
+function renderPassGauge(){
+  const el=document.getElementById('passGaugeCard');
+  if(!el) return;
+  const score=calcPassScore();
+  if(score===null){el.innerHTML='';return;}
+  const r=44,semi=Math.PI*r;
+  const fill=(score/100)*semi,gap=semi-fill;
+  const clr=score>=70?'#16a34a':score>=55?'#D9A060':'#ef4444';
+  const bg=score>=70?'rgba(74,222,128,0.07)':score>=55?'rgba(251,191,36,0.06)':'rgba(239,68,68,0.06)';
+  const lbl=score>=70?'✓ 合格圏内':score>=55?'△ もう少し':'× 要強化';
+  el.innerHTML=`<div onclick="showPassScoreDetail()" style="padding:12px 14px;background:${bg};border:1.5px solid ${clr}44;border-radius:14px;text-align:center;cursor:pointer">
+    <div style="font-size:10px;font-weight:700;color:#B8907A;margin-bottom:4px">🎯 合格予測ゲージ</div>
+    <svg width="120" height="58" viewBox="0 0 120 58" style="display:block;margin:0 auto;overflow:visible">
+      <path d="M 16 52 A 44 44 0 0 1 104 52" fill="none" stroke="rgba(217,197,178,0.45)" stroke-width="11" stroke-linecap="round"/>
+      <path d="M 16 52 A 44 44 0 0 1 104 52" fill="none" stroke="${clr}" stroke-width="11" stroke-linecap="round" stroke-dasharray="${fill.toFixed(1)} ${gap.toFixed(1)}" opacity="0.9" style="transition:stroke-dasharray 0.8s ease"/>
+      <text x="60" y="44" text-anchor="middle" font-size="22" font-weight="700" fill="${clr}" font-family="'Noto Sans JP',sans-serif">${score}</text>
+      <text x="60" y="55" text-anchor="middle" font-size="9" fill="#8A7060" font-family="'Noto Sans JP',sans-serif">/ 100点</text>
+    </svg>
+    <div style="font-size:11px;font-weight:700;color:${clr};margin-top:2px">${lbl}</div>
+    <div style="font-size:9px;color:#aaa;margin-top:1px">タップで詳細表示</div>
+  </div>`;
+}
+// カバー率詳細モーダル
+function showCoverageModal(){
+  const total=QUESTIONS.length;
+  const cats=[{label:'⭐ 必修',cat:'必修'},{label:'📚 一般',cat:'一般'},{label:'📋 状況設定',cat:'状況設定'}];
+  const rows=cats.map(({label,cat})=>{
+    const qs=QUESTIONS.filter(q=>q.category===cat);
+    const tot=qs.length;
+    const mastCt=qs.filter(q=>isMastered(q.id)).length;
+    const wrongCt=qs.filter(q=>!isMastered(q.id)&&history[String(q.id)]&&history[String(q.id)].wrong>0).length;
+    const seenCt=qs.filter(q=>!isMastered(q.id)&&history[String(q.id)]&&!history[String(q.id)].wrong).length;
+    const unCt=tot-mastCt-wrongCt-seenCt;
+    const mP=Math.round(mastCt/tot*100),wP=Math.round(wrongCt/tot*100),sP=Math.round(seenCt/tot*100),uP=100-mP-wP-sP;
+    return `<div style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;font-size:11px;font-weight:700;color:#55504D;margin-bottom:5px"><span>${label}</span><span style="color:#8A6A50;font-weight:400">${tot}問</span></div>
+      <div style="display:flex;height:12px;border-radius:6px;overflow:hidden;gap:1px">
+        <div style="flex:${mP};background:rgba(74,222,128,0.7);min-width:${mastCt?2:0}px" title="克服済み ${mastCt}問"></div>
+        <div style="flex:${sP};background:rgba(59,130,246,0.5);min-width:${seenCt?2:0}px" title="正解のみ ${seenCt}問"></div>
+        <div style="flex:${wP};background:rgba(248,113,113,0.65);min-width:${wrongCt?2:0}px" title="間違えた ${wrongCt}問"></div>
+        <div style="flex:${uP};background:rgba(217,197,178,0.3);min-width:${unCt?2:0}px" title="未解答 ${unCt}問"></div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:4px;flex-wrap:wrap">
+        <span style="font-size:9px;color:#16a34a">■ 克服 ${mastCt}</span>
+        <span style="font-size:9px;color:#3b82f6">■ 正解のみ ${seenCt}</span>
+        <span style="font-size:9px;color:#ef4444">■ 要復習 ${wrongCt}</span>
+        <span style="font-size:9px;color:#B8A090">■ 未解答 ${unCt}</span>
+      </div>
+    </div>`;
+  }).join('');
+  const globalMast=Object.keys(history).filter(id=>isMastered(Number(id))).length;
+  const globalWrong=Object.keys(history).filter(id=>!isMastered(Number(id))&&history[id].wrong>0).length;
+  const globalSeen=Object.keys(history).filter(id=>!isMastered(Number(id))&&!history[id].wrong).length;
+  const globalUn=total-globalMast-globalWrong-globalSeen;
+  const modal=document.createElement('div');
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
+  modal.innerHTML=`<div style="width:100%;max-width:480px;background:linear-gradient(135deg,rgba(252,248,242,0.99),rgba(245,239,232,0.98));border-radius:20px 20px 0 0;padding:20px 20px 32px;max-height:85vh;overflow-y:auto;font-family:'Noto Sans JP',sans-serif">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div style="font-size:14px;font-weight:700;color:#6B5040">📊 カバー率の内訳</div>
+      <button onclick="this.closest('[style*=fixed]').remove()" style="background:none;border:none;font-size:18px;color:#8A6A50;cursor:pointer">✕</button>
+    </div>
+    <div style="padding:10px 14px;background:rgba(240,232,222,0.5);border-radius:12px;margin-bottom:14px;text-align:center">
+      <div style="font-size:11px;color:#8A6A50;margin-bottom:4px">全体（${total}問）</div>
+      <div style="display:flex;height:14px;border-radius:7px;overflow:hidden;gap:1px">
+        <div style="flex:${globalMast};background:rgba(74,222,128,0.7)" title="克服 ${globalMast}"></div>
+        <div style="flex:${globalSeen};background:rgba(59,130,246,0.5)" title="正解のみ ${globalSeen}"></div>
+        <div style="flex:${globalWrong};background:rgba(248,113,113,0.65)" title="要復習 ${globalWrong}"></div>
+        <div style="flex:${globalUn};background:rgba(217,197,178,0.3)" title="未解答 ${globalUn}"></div>
+      </div>
+      <div style="display:flex;justify-content:center;gap:10px;margin-top:6px;flex-wrap:wrap">
+        <span style="font-size:10px;color:#16a34a;font-weight:700">■ 克服 ${globalMast}</span>
+        <span style="font-size:10px;color:#3b82f6;font-weight:700">■ 正解のみ ${globalSeen}</span>
+        <span style="font-size:10px;color:#ef4444;font-weight:700">■ 要復習 ${globalWrong}</span>
+        <span style="font-size:10px;color:#B8A090;font-weight:700">■ 未解答 ${globalUn}</span>
+      </div>
+    </div>
+    ${rows}
+  </div>`;
+  modal.addEventListener('click',e=>{if(e.target===modal)modal.remove();});
+  document.body.appendChild(modal);
+}
+// 間違いノートをクリップボードにコピー
+function exportWrongNotes(){
+  const wrongs=Object.entries(history)
+    .filter(([id,h])=>h.wrong>0&&!isMastered(Number(id)))
+    .sort((a,b)=>b[1].wrong-a[1].wrong)
+    .slice(0,100);
+  if(!wrongs.length){showToast('未克服の間違い問題がありません');return;}
+  const lines=['【間違いノート — NursePass】','作成日：'+todayKey,'─'.repeat(28),''];
+  wrongs.forEach(([id,h],i)=>{
+    const q=QUESTIONS.find(x=>x.id===Number(id));
+    if(!q) return;
+    const field=q.field.replace('必修・','').replace('一般・','').replace('状況設定・','');
+    lines.push(`[${i+1}] ${field}`);
+    lines.push(`Q: ${q.question}`);
+    lines.push(`A: ${q.answer}. ${q.choices[q.answer]}`);
+    lines.push(`解説: ${q.explanation}`);
+    lines.push(`（間違い${h.wrong}回 / 正解${h.correct}回）`);
+    lines.push('─'.repeat(20));
+  });
+  const text=lines.join('\n');
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(()=>showToast(`📓 間違いノートをコピーしました（${wrongs.length}問）`)).catch(()=>{fallbackCopy(text,wrongs.length);});
+  } else {fallbackCopy(text,wrongs.length);}
+}
+function fallbackCopy(text,cnt){
+  const ta=document.createElement('textarea');
+  ta.value=text;ta.style.cssText='position:fixed;opacity:0;top:0;left:0';
+  document.body.appendChild(ta);ta.focus();ta.select();
+  try{document.execCommand('copy');showToast(`📓 間違いノートをコピーしました（${cnt}問）`);}catch(e){showToast('コピーに失敗しました。ブラウザの権限を確認してください');}
+  document.body.removeChild(ta);
+}
 function save(){localStorage.setItem('np_history',JSON.stringify(history))}
 
 function exportData(){
@@ -2186,7 +2300,7 @@ function switchTab(t){
   if(t==='noa') initChat();
   document.getElementById('quizArea').style.display='none';
   // Refresh home widgets when returning
-  if(t==='home'){showResumeBanner();renderTodayPlan();renderTodayTimeline();renderMiniReview();}
+  if(t==='home'){showResumeBanner();renderTodayPlan();renderTodayTimeline();renderMiniReview();renderPassGauge();}
 }
 
 // CATEGORY SELECT
@@ -5083,6 +5197,7 @@ function renderStats(){
       <button onclick="exportCSV()" style="padding:7px 14px;background:rgba(22,163,74,0.1);color:#15803d;border:1.5px solid rgba(22,163,74,0.25);border-radius:10px;font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif">📊 CSVエクスポート</button>
       <button onclick="exportMemos()" style="padding:7px 14px;background:rgba(168,85,247,0.1);color:#7c3aed;border:1.5px solid rgba(168,85,247,0.25);border-radius:10px;font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif">📋 メモをエクスポート</button>
       <button onclick="importData()" style="padding:7px 14px;background:rgba(74,222,128,0.1);color:#166534;border:1.5px solid rgba(74,222,128,0.25);border-radius:10px;font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif">📥 データをインポート</button>
+      <button onclick="exportWrongNotes()" style="padding:7px 14px;background:rgba(239,68,68,0.1);color:#991b1b;border:1.5px solid rgba(239,68,68,0.25);border-radius:10px;font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif">📓 間違いノートをコピー</button>
       <button onclick="setupReminder()" style="padding:7px 14px;background:rgba(245,158,11,0.1);color:#b45309;border:1.5px solid rgba(245,158,11,0.25);border-radius:10px;font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif" id="reminderBtn">🔔 ${localStorage.getItem('np_reminder')?'リマインダー設定済み':'学習リマインダー'}</button>
     </div>
     <div style="margin-top:12px">
@@ -6008,7 +6123,7 @@ updateScoreBadge();
 initDailyMessage();
 renderHomeSummary();
 renderExamCountdown();
-renderGoalBar();renderNoaCard();renderDailyTip();renderDailyBanner();updateSoundBtn();renderSessionGoalBar();renderMiniReview();renderTodayTimeline();renderSearchHistoryChips();
+renderGoalBar();renderNoaCard();renderDailyTip();renderDailyBanner();updateSoundBtn();renderSessionGoalBar();renderMiniReview();renderTodayTimeline();renderSearchHistoryChips();renderPassGauge();
 showResumeBanner();
 initPomodoro();
 renderTodayPlan();
