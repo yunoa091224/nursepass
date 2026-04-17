@@ -307,6 +307,22 @@ body.font-lg .explanation{font-size:14px}
 body.font-xl .q-text{font-size:19px}
 body.font-xl .choice-btn{font-size:16px}
 body.font-xl .explanation{font-size:15px}
+/* ガチモード（本番・反復練習）スタイル */
+.gachi-quiz .card{background:rgba(250,250,253,0.98)!important;border-color:rgba(100,110,130,0.2)!important;box-shadow:0 4px 20px rgba(0,0,0,.07)!important}
+.gachi-quiz .q-bar{background:linear-gradient(90deg,#475569,#334155)!important}
+.gachi-quiz .q-count{font-size:18px!important;font-weight:900!important;color:#1e293b!important;letter-spacing:-.5px}
+.gachi-quiz .q-field{color:#64748b!important}
+.gachi-quiz .q-text{color:#1e293b!important;font-weight:600!important;font-size:16px!important}
+.gachi-quiz .choice-btn{background:rgba(248,250,252,0.96)!important;border-color:rgba(100,116,139,0.3)!important;color:#1e293b!important}
+.gachi-quiz .choice-btn:hover:not(:disabled){border-color:rgba(71,85,105,.55)!important;background:rgba(241,245,249,0.99)!important}
+.gachi-quiz .choice-btn.correct{background:rgba(74,222,128,.14)!important;border-color:#4ade80!important}
+.gachi-quiz .choice-btn.wrong{background:rgba(248,113,113,.12)!important;border-color:#f87171!important}
+.gachi-next-btn{width:calc(100% - 32px);margin:0 16px 16px;padding:18px;background:linear-gradient(135deg,#475569,#334155);color:white;border:none;border-radius:14px;font-size:22px;font-weight:900;cursor:pointer;font-family:"Noto Sans JP",sans-serif;box-shadow:0 4px 16px rgba(51,65,85,.3);letter-spacing:2px}
+/* モード切替スイッチ */
+.mode-switch-wrap{display:flex;gap:6px;margin-bottom:10px;background:rgba(255,255,255,0.75);border:1.5px solid rgba(217,197,178,0.4);border-radius:14px;padding:4px}
+.mode-switch-btn{flex:1;padding:8px 10px;border:none;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;font-family:"Noto Sans JP",sans-serif;transition:.2s;background:transparent;color:#6B5040}
+.mode-switch-btn.active.hikari{background:linear-gradient(135deg,#EDE0D4,#D9C5B2);color:#4A3828;box-shadow:0 2px 8px rgba(184,160,144,.2)}
+.mode-switch-btn.active.gachi{background:linear-gradient(135deg,#475569,#334155);color:white;box-shadow:0 2px 8px rgba(51,65,85,.3)}
 </style>
 </head>
 <body>
@@ -335,6 +351,11 @@ body.font-xl .explanation{font-size:15px}
   </div>
 
   <div id="tabHome">
+    <!-- モード切替スイッチ -->
+    <div class="mode-switch-wrap" id="modeSwitchBar">
+      <button class="mode-switch-btn active hikari" id="modeBtnHikari" onclick="setQuizMode('hikari')">🌸 ヒカリモード</button>
+      <button class="mode-switch-btn gachi" id="modeBtnGachi" onclick="setQuizMode('gachi')">⚡ ガチモード</button>
+    </div>
     <!-- ヒカリのひとこと: 1行コンパクトバナー -->
     <div id="hikariHintBar" style="background:rgba(255,255,255,0.82);border:1.5px solid rgba(217,197,178,0.5);border-radius:14px;padding:9px 16px;margin-bottom:10px;display:flex;align-items:center;gap:10px">
       <span style="font-size:16px;flex-shrink:0">🌸</span>
@@ -666,6 +687,7 @@ function haptic(correct){
 (()=>{const btn=document.getElementById('hapticBtn');if(btn)btn.style.opacity=hapticEnabled?'1':'0.3';})();
 // 正解後自動送り設定
 let autoAdvance=localStorage.getItem('np_auto_advance')==='1';
+let quizMode=localStorage.getItem('np_quiz_mode')||'hikari';
 let skipMastered=localStorage.getItem('np_skip_mastered')==='1';
 let sessionGoal=parseInt(localStorage.getItem('np_session_goal')||'0');
 function toggleSkipMastered(){
@@ -1395,6 +1417,24 @@ function renderHikariHint(){
   if(!el) return;
   const seed=parseInt(todayKey.replace(/-/g,''))%HIKARI_HINTS.length;
   el.textContent=HIKARI_HINTS[seed];
+}
+
+// ====== クイズモード（ヒカリ / ガチ）======
+function setQuizMode(mode){
+  quizMode=mode;
+  localStorage.setItem('np_quiz_mode',mode);
+  updateModeSwitch();
+  // ヒカリのひとこと表示切替
+  const hintBar=document.getElementById('hikariHintBar');
+  if(hintBar) hintBar.style.display=mode==='gachi'?'none':'flex';
+}
+function updateModeSwitch(){
+  const bh=document.getElementById('modeBtnHikari');
+  const bg=document.getElementById('modeBtnGachi');
+  const hintBar=document.getElementById('hikariHintBar');
+  if(bh){bh.classList.toggle('active',quizMode==='hikari');}
+  if(bg){bg.classList.toggle('active',quizMode==='gachi');}
+  if(hintBar) hintBar.style.display=quizMode==='gachi'?'none':'flex';
 }
 function startMainExam(){
   // カテゴリに応じた本番形式を起動
@@ -3174,6 +3214,7 @@ function renderQuestion(){
   const total=session.pool.length;
   const pct=Math.round(session.idx/total*100);
   const isTime=session.mode==='timeatk';
+  qa.className=quizMode==='gachi'?'gachi-quiz':'';
   qa.innerHTML=`
     <div class="card" style="animation:fadein .3s ease">
       <div class="quiz-header">
@@ -3324,8 +3365,8 @@ function answer(key){
     </div>
   </div>
   ${isBm?`<div id="bmTagRow_${q.id}" style="display:flex;gap:5px;margin:4px 0 6px;flex-wrap:wrap"></div>`:''}
-  <div style="font-size:12px;color:${correct?'#166534':'#B8A090'};font-weight:600;margin:4px 0 6px;padding:4px 8px;background:${correct?'rgba(74,222,128,0.08)':'rgba(217,197,178,0.08)'};border-radius:8px">${nmsg}</div>
-  ${wrongAns}${correctAns}<div class="explanation" style="position:relative">${highlightExplanation(q.explanation)}<button onclick="navigator.clipboard.writeText('Q: '+this.closest('.explanation').textContent.trim()).then(()=>showToast('解説をコピーしました'))" style="position:absolute;top:4px;right:4px;padding:2px 6px;background:rgba(240,232,222,0.8);border:1px solid rgba(85,80,77,0.15);border-radius:6px;font-size:10px;color:#8A6A50;cursor:pointer;font-family:'Noto Sans JP',sans-serif" title="解説をコピー">📋</button></div>
+  ${quizMode!=='gachi'?`<div style="font-size:12px;color:${correct?'#166534':'#B8A090'};font-weight:600;margin:4px 0 6px;padding:4px 8px;background:${correct?'rgba(74,222,128,0.08)':'rgba(217,197,178,0.08)'};border-radius:8px">${nmsg}</div>`:''}
+  ${wrongAns}${correctAns}${quizMode==='gachi'?`<details style="margin-top:6px"><summary style="font-size:12px;color:#64748b;cursor:pointer;user-select:none;padding:4px 0">解説を見る ▾</summary><div class="explanation">${highlightExplanation(q.explanation)}</div></details>`:`<div class="explanation" style="position:relative">${highlightExplanation(q.explanation)}<button onclick="navigator.clipboard.writeText('Q: '+this.closest('.explanation').textContent.trim()).then(()=>showToast('解説をコピーしました'))" style="position:absolute;top:4px;right:4px;padding:2px 6px;background:rgba(240,232,222,0.8);border:1px solid rgba(85,80,77,0.15);border-radius:6px;font-size:10px;color:#8A6A50;cursor:pointer;font-family:'Noto Sans JP',sans-serif" title="解説をコピー">📋</button></div>`}
   ${(()=>{const h=history[q.id];if(!h||h.correct+h.wrong<1) return '';const tot=h.correct+h.wrong;const acc=Math.round(h.correct/tot*100);const srs=srsData[q.id];const accColor=acc>=80?'#16a34a':acc>=60?'#D9A060':'#ef4444';return `<div style="margin-top:6px;padding:4px 10px;background:rgba(237,224,212,0.2);border-radius:8px;font-size:10px;color:#8A6A50;display:flex;gap:10px;align-items:center">この問題: <strong style="color:${accColor}">${acc}%</strong>正答 (${tot}回挑戦)${srs?` · 次の復習: ${srs.due<=todayKey?'今日！':`${Math.max(1,Math.ceil((new Date(srs.due)-new Date())/86400000))}日後`}`:''}</div>`;})()}
   ${hasMemo?`<div style="margin-top:8px;padding:8px 10px;background:rgba(217,185,80,0.1);border-left:3px solid #D9A060;border-radius:6px;font-size:12px;color:#5A4420">📝 <strong>マイメモ：</strong>${memoData[q.id]}<button onclick="openMemo(${q.id})" style="margin-left:8px;padding:1px 6px;background:none;border:1px solid rgba(217,160,96,0.4);border-radius:6px;font-size:10px;color:#8A6A50;cursor:pointer;font-family:'Noto Sans JP',sans-serif">編集</button></div>`:!correct?`<div style="margin-top:6px"><button onclick="openMemo(${q.id})" style="padding:4px 12px;background:rgba(217,185,80,0.1);border:1px dashed rgba(217,160,96,0.5);border-radius:8px;font-size:10px;color:#8A6A50;cursor:pointer;font-family:'Noto Sans JP',sans-serif;width:100%;text-align:left">📝 この問題にメモを追加して復習に役立てよう ＋</button></div>`:''}
   ${(()=>{
@@ -3351,28 +3392,41 @@ function answer(key){
   </div>
   `;
   choices.after(res);
-  const mc=createMiniChat(q);
-  res.after(mc);
 
   const isLast=session.idx>=session.pool.length-1;
   const streak10End=session.mode==='streak10'&&(session.streakGameOver||(session.currentStreak||0)>=session.streakTarget);
-  const is5=(session.idx+1)%5===0&&!isLast&&!streak10End;
-  if(is5){
-    const cc=document.createElement('div');
-    cc.className='continue-card';
-    cc.innerHTML=`<div class="continue-title">${session.idx+1}問終わったよ。どうする？</div>
-    <div class="c-btns">
-      <button class="c-btn active" onclick="continueQuiz()">→　続ける</button>
-      <button class="c-btn active" onclick="startWeakFromHere()">△　苦手に絞る</button>
-      <button class="c-btn done" onclick="finishQuiz()">◎　今日はここまで</button>
-    </div>`;
-    mc.after(cc);
-  } else {
+
+  if(quizMode==='gachi'){
+    // ガチモード: シンプル大ボタン（5問区切りなし）
     const nb=document.createElement('button');
-    nb.className='next-btn';nb.id='nextBtn';
-    nb.textContent=(isLast||streak10End)?'結果を見る →':'次の問題 →';
+    nb.className='gachi-next-btn';nb.id='nextBtn';
+    nb.textContent=(isLast||streak10End)?'結果 →':'→';
     nb.onclick=(isLast||streak10End)?finishQuiz:nextQ;
-    mc.after(nb);
+    res.after(nb);
+    // 画面タップでも次へ
+    nb.addEventListener('touchstart',()=>{},{ passive:true });
+  } else {
+    // ヒカリモード: ミニチャット + 5問区切り + 通常ボタン
+    const mc=createMiniChat(q);
+    res.after(mc);
+    const is5=(session.idx+1)%5===0&&!isLast&&!streak10End;
+    if(is5){
+      const cc=document.createElement('div');
+      cc.className='continue-card';
+      cc.innerHTML=`<div class="continue-title">${session.idx+1}問終わったよ。どうする？</div>
+      <div class="c-btns">
+        <button class="c-btn active" onclick="continueQuiz()">→　続ける</button>
+        <button class="c-btn active" onclick="startWeakFromHere()">△　苦手に絞る</button>
+        <button class="c-btn done" onclick="finishQuiz()">◎　今日はここまで</button>
+      </div>`;
+      mc.after(cc);
+    } else {
+      const nb=document.createElement('button');
+      nb.className='next-btn';nb.id='nextBtn';
+      nb.textContent=(isLast||streak10End)?'結果を見る →':'次の問題 →';
+      nb.onclick=(isLast||streak10End)?finishQuiz:nextQ;
+      mc.after(nb);
+    }
   }
 }
 
@@ -3568,7 +3622,7 @@ function finishQuiz(){
       <button class="result-retry" onclick="retrySession()">もう一度やる</button>
       <button class="result-home" onclick="stopTts();backHome()">ホームへ戻る</button>
       <button onclick="shareResult(${rate},${total},${session.correct})" style="width:100%;padding:12px;background:rgba(59,130,246,0.1);color:#1d4ed8;border:1.5px solid rgba(59,130,246,0.3);border-radius:14px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;margin-bottom:8px">📤 結果をシェア</button>
-      <button class="cal-btn" onclick="showCalModal('NursePass 看護師国試 学習', '正解率 ${rate}% (${total}問中${session.correct}問正解)')">📅 次の学習をカレンダーに追加</button>
+      ` + (quizMode!=='gachi'?`<button class="cal-btn" onclick="showCalModal('NursePass 看護師国試 学習', '正解率 ${rate}% (${total}問中${session.correct}問正解)')">📅 次の学習をカレンダーに追加</button>`:'') + `
       ${(()=>{
         // 次の学習提案
         const suggestions=[];
@@ -6264,7 +6318,7 @@ updateScoreBadge();
 initDailyMessage();
 renderHomeSummary();
 renderExamCountdown();
-renderHikariHint();renderGoalBar();renderNoaCard();renderDailyTip();renderDailyBanner();updateSoundBtn();renderSessionGoalBar();renderMiniReview();renderTodayTimeline();renderSearchHistoryChips();renderPassGauge();
+renderHikariHint();updateModeSwitch();renderGoalBar();renderNoaCard();renderDailyTip();renderDailyBanner();updateSoundBtn();renderSessionGoalBar();renderMiniReview();renderTodayTimeline();renderSearchHistoryChips();renderPassGauge();
 showResumeBanner();
 initPomodoro();
 renderTodayPlan();
