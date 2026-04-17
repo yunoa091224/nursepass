@@ -335,17 +335,42 @@ body.font-xl .explanation{font-size:15px}
   </div>
 
   <div id="tabHome">
-    <div class="daily-msg-card" id="dailyMsgCard">
-      <div class="daily-msg-avatar"><img class="noa-av-img" id="dailyAvImg" src="" alt="ヒカリ"></div>
-      <div class="daily-msg-content">
-        <div class="daily-msg-label">🌸 今日のヒカリより</div>
-        <div class="daily-msg-text" id="dailyMsgText"></div>
-        <div class="daily-msg-footer">
-          <span class="daily-msg-date" id="dailyMsgDate"></span>
-          <span class="daily-msg-countdown" id="dailyMsgCountdown"></span>
-        </div>
-      </div>
+    <!-- ヒカリのひとこと: 1行コンパクトバナー -->
+    <div id="hikariHintBar" style="background:rgba(255,255,255,0.82);border:1.5px solid rgba(217,197,178,0.5);border-radius:14px;padding:9px 16px;margin-bottom:10px;display:flex;align-items:center;gap:10px">
+      <span style="font-size:16px;flex-shrink:0">🌸</span>
+      <span id="hikariHintText" style="font-size:12px;color:#4A3828;font-weight:500;line-height:1.4;flex:1"></span>
     </div>
+    <!-- カテゴリ選択タブ（最上部に移動） -->
+    <div class="sub-tabs" style="margin-bottom:10px">
+      <button class="sub-tab active" data-cat="必修" onclick="selectCategory('必修')">必修<span class="cat-count" id="catCount必修"></span></button>
+      <button class="sub-tab" data-cat="一般" onclick="selectCategory('一般')">一般<span class="cat-count" id="catCount一般"></span></button>
+      <button class="sub-tab" data-cat="状況設定" onclick="selectCategory('状況設定')">状況設定<span class="cat-count" id="catCount状況設定"></span></button>
+    </div>
+    <!-- クイックスタートグリッド: スクロールなしで全ボタン表示 -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px">
+      <button onclick="startQuizWithCount('random',5)" style="padding:16px 12px;background:linear-gradient(135deg,rgba(245,239,232,0.98),rgba(237,224,212,0.95));border:1.5px solid rgba(217,197,178,0.6);border-radius:18px;cursor:pointer;text-align:left;font-family:'Noto Sans JP',sans-serif;display:flex;align-items:center;gap:10px;box-shadow:0 2px 8px rgba(184,160,144,.1)">
+        <span style="font-size:24px">🎲</span>
+        <div><div style="font-size:14px;font-weight:700;color:#4A3828">ランダム5問</div><div style="font-size:10px;color:#8A6A50;margin-top:2px">まず一問から</div></div>
+      </button>
+      <button onclick="pickCount('field','分野別')" style="padding:16px 12px;background:linear-gradient(135deg,rgba(245,239,232,0.98),rgba(237,224,212,0.95));border:1.5px solid rgba(217,197,178,0.6);border-radius:18px;cursor:pointer;text-align:left;font-family:'Noto Sans JP',sans-serif;display:flex;align-items:center;gap:10px;box-shadow:0 2px 8px rgba(184,160,144,.1)">
+        <span style="font-size:24px">📖</span>
+        <div><div style="font-size:14px;font-weight:700;color:#4A3828">分野別</div><div style="font-size:10px;color:#8A6A50;margin-top:2px">得意・苦手を選んで</div></div>
+      </button>
+      <button onclick="startQuiz('weak')" style="padding:16px 12px;background:linear-gradient(135deg,rgba(255,245,245,0.98),rgba(255,235,230,0.9));border:1.5px solid rgba(248,113,113,0.3);border-radius:18px;cursor:pointer;text-align:left;font-family:'Noto Sans JP',sans-serif;display:flex;align-items:center;gap:10px;box-shadow:0 2px 8px rgba(248,113,113,.08)">
+        <span style="font-size:24px">💪</span>
+        <div><div style="font-size:14px;font-weight:700;color:#4A3828">苦手強化</div><div style="font-size:10px;color:#8A6A50;margin-top:2px">間違えた問題だけ</div></div>
+      </button>
+      <button onclick="startMainExam()" style="padding:16px 12px;background:linear-gradient(135deg,rgba(240,247,255,0.98),rgba(219,234,254,0.9));border:1.5px solid rgba(59,130,246,0.3);border-radius:18px;cursor:pointer;text-align:left;font-family:'Noto Sans JP',sans-serif;display:flex;align-items:center;gap:10px;box-shadow:0 2px 8px rgba(59,130,246,.08)">
+        <span style="font-size:24px">📝</span>
+        <div><div style="font-size:14px;font-weight:700;color:#4A3828">本番形式</div><div style="font-size:10px;color:#8A6A50;margin-top:2px" id="mainExamDesc">50問チャレンジ</div></div>
+      </button>
+    </div>
+    <!-- 暗記カードボタン (full width) -->
+    <button onclick="showFlashCards()" style="width:100%;padding:12px 16px;background:linear-gradient(135deg,rgba(253,242,255,0.92),rgba(245,232,255,0.82));border:1.5px solid rgba(200,170,230,0.4);border-radius:16px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;display:flex;align-items:center;gap:12px;margin-bottom:14px;box-shadow:0 2px 8px rgba(180,120,220,.08)">
+      <span style="font-size:22px">🃏</span>
+      <div style="text-align:left"><div style="font-size:13px;font-weight:700;color:#4A3050">暗記カード</div><div style="font-size:10px;color:#7B5090;margin-top:2px">検査値・薬物・看護技術などを用語カードで確認</div></div>
+    </button>
+    <!-- 統計サマリー（クイックボタンの下） -->
     <div class="home-summary">
       <div class="summary-card" onclick="showStreakDetail()"><div class="summary-val" id="streakDisp">0</div><div class="summary-lbl">🔥 連続学習日<span id="bestStreakLbl" style="display:block;font-size:9px;color:#aaa;margin-top:1px"></span></div></div>
       <div class="summary-card"><div class="summary-val" id="todayDisp">0</div><div class="summary-lbl">📝 今日の問題数</div></div>
@@ -372,6 +397,7 @@ body.font-xl .explanation{font-size:15px}
     <div class="search-results" id="searchResults"></div>
     <div id="weakFieldQuick" style="margin-bottom:10px"></div>
     <div id="dailyBanner" style="margin-bottom:10px"></div>
+    <!-- 本番模擬試験ボタン（下部に移動） -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
       <button onclick="startQuiz('mock')" style="padding:14px 12px;background:linear-gradient(135deg,#6B5040,#8A6A50);color:white;border:none;border-radius:18px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;box-shadow:0 4px 16px rgba(107,80,64,0.3);display:flex;align-items:center;justify-content:center;gap:8px">
         <span style="font-size:18px">📝</span>
@@ -382,12 +408,9 @@ body.font-xl .explanation{font-size:15px}
         <div style="text-align:left"><div>ミニ模擬試験</div><div style="font-size:10px;font-weight:400;opacity:0.85">25問（30分）</div></div>
       </button>
     </div>
+    <!-- 全モード・分野選択 -->
     <div class="card">
-      <div class="sub-tabs">
-        <button class="sub-tab active" data-cat="必修" onclick="selectCategory('必修')">必修<span class="cat-count" id="catCount必修"></span></button>
-        <button class="sub-tab" data-cat="一般" onclick="selectCategory('一般')">一般<span class="cat-count" id="catCount一般"></span></button>
-        <button class="sub-tab" data-cat="状況設定" onclick="selectCategory('状況設定')">状況設定<span class="cat-count" id="catCount状況設定"></span></button>
-      </div>
+      <div style="padding:10px 16px 4px;font-size:11px;font-weight:700;color:#8A6A50;letter-spacing:.04em">▸ 全モード・分野選択</div>
       <div class="field-select">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
           <div class="field-label" style="margin-bottom:0">▸ 分野を選ぶ（複数選択可・未選択で全分野）</div>
@@ -1349,12 +1372,51 @@ function renderNoaCard(){
   el.innerHTML=`<div style="background:linear-gradient(135deg,rgba(245,239,232,0.92),rgba(237,224,212,0.85));border:1.5px solid rgba(217,197,178,0.45);border-radius:16px;padding:12px 16px;display:flex;gap:10px;align-items:flex-start">
     <div style="font-size:22px;flex-shrink:0;margin-top:1px">${icon}</div>
     <div>
-      <div style="font-size:10px;font-weight:700;color:#B8907A;letter-spacing:.8px;margin-bottom:4px">のあ先生より</div>
+      <div style="font-size:10px;font-weight:700;color:#B8907A;letter-spacing:.8px;margin-bottom:4px">ヒカリより</div>
       <div style="font-size:13px;color:#4A3828;line-height:1.7;font-weight:500">${msg}</div>
     </div>
   </div>`;
 }
-// のあ先生デイリーヒント
+// ヒカリのひとこと（ホーム1行バナー用）日替わり低ハードルメッセージ
+const HIKARI_HINTS=[
+  'まず一問だけ、ちょっとやってみよう。',
+  '今日もいるよ。一問だけ、一緒に始めよう。',
+  '疲れてても大丈夫。ちょっとだけやれば十分だよ。',
+  '今日の一問が、明日の自信になるよ。',
+  '難しくなくていいよ。とりあえず始めてみよう。',
+  'ここに来てくれただけで、もう一歩進んでるよ。',
+  '一問解くだけで、脳が動き出すよ。やってみて。',
+  '焦らなくていい。今日も一緒にゆっくり進もう。',
+  '5問だけ、それだけでいい。一緒にやろう。',
+  '今日もそっと隣にいるよ。いつでも始めてね。',
+];
+function renderHikariHint(){
+  const el=document.getElementById('hikariHintText');
+  if(!el) return;
+  const seed=parseInt(todayKey.replace(/-/g,''))%HIKARI_HINTS.length;
+  el.textContent=HIKARI_HINTS[seed];
+}
+function startMainExam(){
+  // カテゴリに応じた本番形式を起動
+  if(currentCategory==='必修') startQuiz('hisshu');
+  else if(currentCategory==='一般') startQuiz('ippan50');
+  else startJokyoMode();
+  // 説明文も更新
+  const d=document.getElementById('mainExamDesc');
+  if(d){
+    if(currentCategory==='必修') d.textContent='必修50問・合否判定';
+    else if(currentCategory==='一般') d.textContent='一般50問演習';
+    else d.textContent='状況設定専用モード';
+  }
+}
+function updateMainExamDesc(){
+  const d=document.getElementById('mainExamDesc');
+  if(!d) return;
+  if(currentCategory==='必修') d.textContent='必修50問・合否判定';
+  else if(currentCategory==='一般') d.textContent='一般50問演習';
+  else d.textContent='状況設定専用モード';
+}
+// ヒカリのデイリーヒント
 const NOA_TIPS=[
   {icon:'💊',text:'薬の5R（正しい患者・薬・量・経路・時間）は毎回確認。投薬エラーの大半はダブルチェックで防げます。'},
   {icon:'🫀',text:'心電図のP-QRS-Tは「心房→房室→心室」の順。QT延長は致死性不整脈のサインなので要注意！'},
@@ -1395,7 +1457,7 @@ function renderDailyTip(){
   el.innerHTML=`<div style="background:linear-gradient(135deg,rgba(253,242,255,0.85),rgba(245,232,255,0.75));border:1.5px solid rgba(200,170,230,0.35);border-radius:14px;padding:10px 14px;display:flex;gap:10px;align-items:flex-start">
     <div style="font-size:20px;flex-shrink:0;margin-top:2px">${tip.icon}</div>
     <div>
-      <div style="font-size:10px;font-weight:700;color:#9B6AC0;letter-spacing:.8px;margin-bottom:3px">のあ先生の今日のひとこと</div>
+      <div style="font-size:10px;font-weight:700;color:#9B6AC0;letter-spacing:.8px;margin-bottom:3px">ヒカリのひとこと</div>
       <div style="font-size:12px;color:#4A3050;line-height:1.7">${tip.text}</div>
     </div>
   </div>`;
@@ -2312,6 +2374,7 @@ function selectCategory(cat){
   });
   initChips();
   initModeButtons();
+  updateMainExamDesc();
 }
 
 // FIELD CHIPS
@@ -3193,7 +3256,7 @@ function answer(key){
       setTimeout(()=>{
         const toast=document.createElement('div');
         toast.style.cssText='position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,rgba(245,239,232,0.97),rgba(237,224,212,0.95));border:1.5px solid rgba(217,197,178,0.6);border-radius:16px;padding:12px 16px;font-size:12px;color:#4A3828;font-family:"Noto Sans JP",sans-serif;text-align:center;z-index:9000;box-shadow:0 4px 20px rgba(184,144,122,0.25);max-width:280px;width:90%';
-        toast.innerHTML=`<div style="font-size:10px;font-weight:700;color:#B8907A;margin-bottom:5px">🌸 のあ先生</div><div style="font-size:11px;line-height:1.5">${msgs[Math.floor(Math.random()*msgs.length)]}</div><div style="display:flex;gap:6px;margin-top:8px"><button onclick="this.closest('div[style]').remove();startWeakFromHere()" style="flex:1;padding:5px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:8px;font-size:10px;color:#dc2626;cursor:pointer;font-family:'Noto Sans JP',sans-serif">苦手に絞る</button><button onclick="this.closest('div[style]').remove()" style="flex:1;padding:5px;background:rgba(240,232,222,0.8);border:1px solid rgba(85,80,77,0.2);border-radius:8px;font-size:10px;color:#6B5040;cursor:pointer;font-family:'Noto Sans JP',sans-serif">続ける</button></div>`;
+        toast.innerHTML=`<div style="font-size:10px;font-weight:700;color:#B8907A;margin-bottom:5px">🌸 ヒカリ</div><div style="font-size:11px;line-height:1.5">${msgs[Math.floor(Math.random()*msgs.length)]}</div><div style="display:flex;gap:6px;margin-top:8px"><button onclick="this.closest('div[style]').remove();startWeakFromHere()" style="flex:1;padding:5px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:8px;font-size:10px;color:#dc2626;cursor:pointer;font-family:'Noto Sans JP',sans-serif">苦手に絞る</button><button onclick="this.closest('div[style]').remove()" style="flex:1;padding:5px;background:rgba(240,232,222,0.8);border:1px solid rgba(85,80,77,0.2);border-radius:8px;font-size:10px;color:#6B5040;cursor:pointer;font-family:'Noto Sans JP',sans-serif">続ける</button></div>`;
         document.body.appendChild(toast);
         setTimeout(()=>{if(toast.parentNode)toast.remove();},8000);
       },600);
@@ -3395,7 +3458,7 @@ function finishQuiz(){
     const sign=diff>=0?'+':'';
     goalResult=`<div style="margin:0 0 12px;padding:10px 14px;border-radius:12px;text-align:center;background:${goalMet?'rgba(74,222,128,0.12)':'rgba(248,113,113,0.08)'};border:1.5px solid ${goalMet?'rgba(74,222,128,0.4)':'rgba(252,165,165,0.4)'}">
       <div style="font-size:11px;font-weight:700;color:${goalMet?'#166534':'#991b1b'}">${goalMet?'🎯 目標達成！':'🎯 目標未達'} 目標 ${sessionGoal}% → 結果 ${rate}%（${sign}${diff}%）</div>
-      <div style="font-size:10px;color:${goalMet?'#16a34a':'#dc2626'};margin-top:3px">${goalMet?'すばらしい！このまま続けよう！':Math.abs(diff)<=5?'あと少し！次回はきっと届く！':'もう一度挑戦してみよう。のあ先生が応援しています。'}</div>
+      <div style="font-size:10px;color:${goalMet?'#16a34a':'#dc2626'};margin-top:3px">${goalMet?'すばらしい！このまま続けよう！':Math.abs(diff)<=5?'あと少し！次回はきっと届く！':'もう一度挑戦してみよう。ヒカリが応援しています。'}</div>
     </div>`;
     if(goalMet) setTimeout(()=>{launchConfetti();},300);
   }
@@ -3535,7 +3598,7 @@ function finishQuiz(){
           </div>
         </div>`;
       })()}
-      ${(()=>{const msgs=[rate>=90?'完璧な結果だね。このまま本番でも力を発揮できるよ🌸':'今日も一歩前へ進んだよ。続けることが一番大切だよ✨',rate>=70?'着実に力がついてきてるよ。あと少しで合格圏内だね🌟':'間違えた問題が、明日のあなたを強くしてくれる。大丈夫✨',streakData.streak>=3?`${streakData.streak}日連続！その習慣が本物の実力になるよ🔥`:'毎日少しでもいい。続けていくことが合格への道だよ💫',Object.keys(bookmarks).length>0?'ブックマークした問題は宝物。後でじっくり復習してね🌸':'気になった問題はブックマークしておくと後で見返せるよ✨'];const msg=msgs[Math.floor(Math.random()*msgs.length)];return`<div style="margin-top:12px;padding:10px 12px;background:linear-gradient(135deg,rgba(245,239,232,0.9),rgba(237,224,212,0.85));border:1.5px solid rgba(217,197,178,0.4);border-radius:12px;font-size:11px;color:#4A3828;line-height:1.6;text-align:center"><span style="font-size:10px;font-weight:700;color:#B8907A;display:block;margin-bottom:4px">🌸 のあ先生より</span>${msg}</div>`;})()}
+      ${(()=>{const msgs=[rate>=90?'完璧な結果だね。このまま本番でも力を発揮できるよ🌸':'今日も一歩前へ進んだよ。続けることが一番大切だよ✨',rate>=70?'着実に力がついてきてるよ。あと少しで合格圏内だね🌟':'間違えた問題が、明日のあなたを強くしてくれる。大丈夫✨',streakData.streak>=3?`${streakData.streak}日連続！その習慣が本物の実力になるよ🔥`:'毎日少しでもいい。続けていくことが合格への道だよ💫',Object.keys(bookmarks).length>0?'ブックマークした問題は宝物。後でじっくり復習してね🌸':'気になった問題はブックマークしておくと後で見返せるよ✨'];const msg=msgs[Math.floor(Math.random()*msgs.length)];return`<div style="margin-top:12px;padding:10px 12px;background:linear-gradient(135deg,rgba(245,239,232,0.9),rgba(237,224,212,0.85));border:1.5px solid rgba(217,197,178,0.4);border-radius:12px;font-size:11px;color:#4A3828;line-height:1.6;text-align:center"><span style="font-size:10px;font-weight:700;color:#B8907A;display:block;margin-bottom:4px">🌸 ヒカリより</span>${msg}</div>`;})()}
     </div>
   </div>`;
   recordStudyTime();
@@ -4029,7 +4092,7 @@ function drillField(fieldName){
   showToast(`${fieldName.replace('必修・','').replace('一般・','').replace('状況設定・','')} の特訓開始！`);
 }
 
-// のあ先生AI学習分析
+// ヒカリ AI学習分析
 async function requestNoaAnalysis(){
   const key=localStorage.getItem('np_openai_key');
   if(!key){showApiKeyModal();return;}
@@ -4037,7 +4100,7 @@ async function requestNoaAnalysis(){
   const out=document.getElementById('noaAnalysisOutput');
   if(!btn||!out) return;
   btn.disabled=true;btn.textContent='分析中...';
-  out.style.display='block';out.innerHTML='<div style="color:#8A6A50;font-size:12px">のあ先生が分析しています…</div>';
+  out.style.display='block';out.innerHTML='<div style="color:#8A6A50;font-size:12px">ヒカリが分析しています…</div>';
   // Build stats summary
   const total=Object.keys(history).length;
   const answered=Object.values(history).reduce((s,h)=>s+h.correct+h.wrong,0);
@@ -4059,18 +4122,18 @@ async function requestNoaAnalysis(){
       method:'POST',
       headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
       body:JSON.stringify({model:'gpt-4o-mini',messages:[
-        {role:'system',content:'あなたは看護師国家試験対策アプリ「NursePass」のAIコーチ「のあ先生（叶愛）」です。静かなやさしさで不安な心に寄り添い、温かく励ます口調で学習アドバイスをします。200字以内で簡潔に。'},
+        {role:'system',content:'あなたは看護師国家試験対策アプリ「NursePass」のAIコーチ「ヒカリ（叶愛）」です。静かなやさしさで不安な心に寄り添い、温かく励ます口調で学習アドバイスをします。200字以内で簡潔に。'},
         {role:'user',content:`以下の学習データに基づき、具体的で実用的な学習アドバイスをください。\n\n${summary}`}
       ],max_tokens:250,temperature:0.7})
     });
     if(!res.ok) throw new Error('API error '+res.status);
     const data=await res.json();
     const reply=data.choices?.[0]?.message?.content||'うまく取得できなかったよ。もう一度試してね。';
-    out.innerHTML=`<div style="display:flex;gap:10px;align-items:flex-start"><div style="font-size:20px">🌸</div><div style="flex:1"><div style="font-size:12px;color:#55504D;line-height:1.7">${reply.replace(/\n/g,'<br>')}</div><div style="font-size:9px;color:#aaa;margin-top:6px">のあ先生 · ${new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}</div></div></div>`;
+    out.innerHTML=`<div style="display:flex;gap:10px;align-items:flex-start"><div style="font-size:20px">🌸</div><div style="flex:1"><div style="font-size:12px;color:#55504D;line-height:1.7">${reply.replace(/\n/g,'<br>')}</div><div style="font-size:9px;color:#aaa;margin-top:6px">ヒカリ · ${new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'})}</div></div></div>`;
   }catch(e){
     out.innerHTML=`<div style="font-size:11px;color:#dc2626">分析に失敗しました。もう一度お試しください。</div>`;
   }
-  btn.disabled=false;btn.textContent='🌸 のあ先生に分析してもらう';
+  btn.disabled=false;btn.textContent='🌸 ヒカリに分析してもらう';
 }
 // 5大分野強度マップ
 function renderStrengthMap(){
@@ -4940,7 +5003,7 @@ function renderStats(){
     if(!tips.length&&bestField&&bestField.rate>=80) tips.push(`「${bestField.label}」が得意分野です（${bestField.rate}%）。他の分野も同様に伸ばしていきましょう。`);
     if(!tips.length) return '';
     return `<div style="margin-bottom:14px;padding:12px 14px;background:linear-gradient(135deg,rgba(245,239,232,0.9),rgba(240,230,218,0.85));border:1.5px solid rgba(217,197,178,0.4);border-radius:14px;text-align:left">
-      <div style="font-size:11px;font-weight:700;color:#B8907A;margin-bottom:8px">🌸 のあ先生からのアドバイス</div>
+      <div style="font-size:11px;font-weight:700;color:#B8907A;margin-bottom:8px">🌸 ヒカリからのアドバイス</div>
       ${tips.slice(0,2).map(t=>`<div style="font-size:12px;color:#4A3828;line-height:1.6;margin-bottom:4px;padding-left:8px;border-left:2px solid #D9C5B2">${t}</div>`).join('')}
     </div>`;
   })();
@@ -5277,7 +5340,7 @@ function renderStats(){
       <button onclick="setupReminder()" style="padding:7px 14px;background:rgba(245,158,11,0.1);color:#b45309;border:1.5px solid rgba(245,158,11,0.25);border-radius:10px;font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif" id="reminderBtn">🔔 ${localStorage.getItem('np_reminder')?'リマインダー設定済み':'学習リマインダー'}</button>
     </div>
     <div style="margin-top:12px">
-      <button id="noaAnalysisBtn" onclick="requestNoaAnalysis()" style="width:100%;padding:10px;background:linear-gradient(135deg,rgba(245,239,232,0.9),rgba(237,224,212,0.8));border:1.5px solid rgba(217,197,178,0.5);border-radius:12px;font-size:13px;font-weight:700;color:#B8907A;cursor:pointer;font-family:'Noto Sans JP',sans-serif">🌸 のあ先生に学習分析してもらう</button>
+      <button id="noaAnalysisBtn" onclick="requestNoaAnalysis()" style="width:100%;padding:10px;background:linear-gradient(135deg,rgba(245,239,232,0.9),rgba(237,224,212,0.8));border:1.5px solid rgba(217,197,178,0.5);border-radius:12px;font-size:13px;font-weight:700;color:#B8907A;cursor:pointer;font-family:'Noto Sans JP',sans-serif">🌸 ヒカリに学習分析してもらう</button>
       <div id="noaAnalysisOutput" style="display:none;margin-top:8px;padding:12px 14px;background:linear-gradient(135deg,rgba(245,239,232,0.9),rgba(237,224,212,0.85));border:1.5px solid rgba(217,197,178,0.4);border-radius:12px"></div>
     </div>
     <button onclick="if(confirm('記録をすべてリセットしますか？')){localStorage.removeItem('np_history');localStorage.removeItem('np_streak');localStorage.removeItem('np_weekly');localStorage.removeItem('np_badges');localStorage.removeItem('np_today_wrong');localStorage.removeItem('np_mock_history');localStorage.removeItem('np_flash_progress');localStorage.removeItem('np_srs');localStorage.removeItem('np_daily');localStorage.removeItem('np_memos');localStorage.removeItem('np_best');localStorage.removeItem('np_daily_acc');localStorage.removeItem('np_wrong_choices');history={};streakData={lastDate:'',streak:0};weeklyData={};earnedBadges=[];mockHistory=[];flashProgress={};srsData={};dailyChallenge=null;memoData={};bestScores={};dailyAccuracy={};wrongChoices={};updateScoreBadge();renderStats();renderHomeSummary();}" style="margin-top:12px;background:none;border:none;color:#5A5450;font-size:11px;cursor:pointer;font-family:'Noto Sans JP',sans-serif">記録をリセット</button>
@@ -6079,9 +6142,10 @@ function initDailyMessage(){
   const examYear=today.getMonth()===1&&today.getDate()<15?today.getFullYear():today.getFullYear()+1;
   const examDate=new Date(examYear,1,15,0,0,0);
   const diffDays=Math.ceil((examDate-today)/(1000*60*60*24));
-  document.getElementById('dailyMsgText').textContent=msg;
-  document.getElementById('dailyMsgDate').textContent=`${m}月${d}日`;
-  document.getElementById('dailyMsgCountdown').textContent=diffDays>0?`国試まで${diffDays}日、一緒に頑張ろう✨`:'今日も一歩ずつ、一緒に歩いていこう✨';
+  const _setText=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
+  _setText('dailyMsgText',msg);
+  _setText('dailyMsgDate',`${m}月${d}日`);
+  _setText('dailyMsgCountdown',diffDays>0?`国試まで${diffDays}日、一緒に頑張ろう✨`:'今日も一歩ずつ、一緒に歩いていこう✨');
 }
 
 // 初回起動時APIキーモーダル（キー未設定かつ初回のみ）
@@ -6200,7 +6264,7 @@ updateScoreBadge();
 initDailyMessage();
 renderHomeSummary();
 renderExamCountdown();
-renderGoalBar();renderNoaCard();renderDailyTip();renderDailyBanner();updateSoundBtn();renderSessionGoalBar();renderMiniReview();renderTodayTimeline();renderSearchHistoryChips();renderPassGauge();
+renderHikariHint();renderGoalBar();renderNoaCard();renderDailyTip();renderDailyBanner();updateSoundBtn();renderSessionGoalBar();renderMiniReview();renderTodayTimeline();renderSearchHistoryChips();renderPassGauge();
 showResumeBanner();
 initPomodoro();
 renderTodayPlan();
@@ -6221,7 +6285,7 @@ renderTodayPlan();
   const msg=msgs[Math.floor(Math.random()*msgs.length)];
   const el=document.createElement('div');
   el.style.cssText='position:fixed;top:60px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,rgba(245,239,232,0.97),rgba(237,224,212,0.95));border:1.5px solid rgba(217,197,178,0.6);border-radius:16px;padding:12px 18px;font-size:13px;color:#4A3828;font-family:"Noto Sans JP",sans-serif;font-weight:600;text-align:center;z-index:9000;box-shadow:0 4px 20px rgba(184,144,122,0.25);max-width:280px;cursor:pointer;animation:fadein .4s ease';
-  el.innerHTML=`<div style="font-size:11px;color:#B8907A;margin-bottom:4px">🌸 のあ先生より</div>${msg}`;
+  el.innerHTML=`<div style="font-size:11px;color:#B8907A;margin-bottom:4px">🌸 ヒカリより</div>${msg}`;
   el.onclick=()=>el.remove();
   document.body.appendChild(el);
   setTimeout(()=>el.remove(),5000);
