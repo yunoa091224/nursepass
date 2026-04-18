@@ -373,6 +373,20 @@ body.font-xl .explanation{font-size:15px}
 .answer-feedback-wrap{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9999;pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:12px;}
 .answer-feedback-symbol{font-weight:900;line-height:1;text-align:center;}
 .answer-feedback-text{font-weight:700;text-align:center;}
+
+/* ===== HIKARI MSG TOAST ===== */
+@keyframes hikariMsgIn{0%{opacity:0;transform:translateX(-50%) translateY(14px);}100%{opacity:1;transform:translateX(-50%) translateY(0);}}
+.hikari-msg-toast{position:fixed;bottom:78px;left:50%;transform:translateX(-50%);z-index:9500;display:flex;align-items:center;gap:10px;background:linear-gradient(135deg,rgba(245,239,232,0.97),rgba(237,224,212,0.95));border:1.5px solid rgba(217,197,178,0.65);border-radius:20px;padding:10px 14px;box-shadow:0 4px 20px rgba(184,144,122,0.3);max-width:300px;width:88%;pointer-events:none;animation:hikariMsgIn .35s ease forwards;}
+.hikari-msg-av{width:34px;height:34px;border-radius:50%;flex-shrink:0;overflow:hidden;background:linear-gradient(135deg,#EDE0D4,#D9C5B2);}
+.hikari-msg-av img{width:100%;height:100%;object-fit:contain;}
+.hikari-msg-body{font-size:12px;color:#4A3828;font-weight:500;line-height:1.55;font-family:'Noto Sans JP',sans-serif;}
+#streakHomeBadge{text-align:center;font-size:12px;font-weight:700;color:#B8907A;letter-spacing:.3px;margin-bottom:10px;display:none;}
+@keyframes lv1Spark{0%,100%{box-shadow:0 3px 10px rgba(217,197,178,0.3);}50%{box-shadow:0 0 12px 5px rgba(255,220,130,0.55),0 0 20px 8px rgba(255,220,130,0.18);}}
+@keyframes lv2Gold{0%,100%{box-shadow:0 0 8px 3px rgba(212,175,55,0.5);}50%{box-shadow:0 0 20px 8px rgba(212,175,55,0.9),0 0 32px 14px rgba(212,175,55,0.22);}}
+@keyframes lv3Rainbow{0%{box-shadow:0 0 14px 5px rgba(255,80,80,0.7);}17%{box-shadow:0 0 14px 5px rgba(255,155,40,0.7);}34%{box-shadow:0 0 14px 5px rgba(240,220,40,0.7);}50%{box-shadow:0 0 14px 5px rgba(50,200,80,0.7);}67%{box-shadow:0 0 14px 5px rgba(60,130,255,0.7);}84%{box-shadow:0 0 14px 5px rgba(170,60,255,0.7);}100%{box-shadow:0 0 14px 5px rgba(255,80,80,0.7);}}
+.hikari-av-lv1{animation:lv1Spark 2.5s ease-in-out infinite;}
+.hikari-av-lv2{animation:lv2Gold 2s ease-in-out infinite;}
+.hikari-av-lv3,.hikari-av-lv4{animation:lv3Rainbow 3s linear infinite;}
 </style>
 </head>
 <body ontouchstart="">
@@ -396,7 +410,7 @@ body.font-xl .explanation{font-size:15px}
   <div id="tabHome">
     <!-- エリア2: ヒカリのひとこと (daily-msg-card) -->
     <div id="hikariHintBar" class="daily-msg-card" style="margin-bottom:12px">
-      <div class="daily-msg-avatar"><img class="noa-av-img" id="dailyAvImg" src="" alt="ヒカリ"></div>
+      <div style="position:relative;flex-shrink:0"><div class="daily-msg-avatar" id="dailyMsgAvDiv"><img class="noa-av-img" id="dailyAvImg" src="" alt="ヒカリ"></div><span id="hikariCrown" style="display:none;position:absolute;top:-11px;left:50%;transform:translateX(-50%);font-size:15px;line-height:1;z-index:2">👑</span></div>
       <div class="daily-msg-content">
         <div class="daily-msg-label">ヒカリより</div>
         <div class="daily-msg-text" id="dailyMsgText"></div>
@@ -406,6 +420,7 @@ body.font-xl .explanation{font-size:15px}
         </div>
       </div>
     </div>
+    <div id="streakHomeBadge"></div>
     <!-- エリア3: モード切替 -->
     <div class="mode-switch-wrap" id="modeSwitchBar" style="margin-bottom:18px">
       <button class="mode-switch-btn active hikari" id="modeBtnHikari" onclick="setQuizMode('hikari')">🌸 やさしく</button>
@@ -3377,6 +3392,42 @@ function renderQuestion(){
   if(isTime) startQuizTimer();
 }
 
+
+// ===== HIKARI SCENE MESSAGES =====
+function showHikariMsg(text,duration){
+  duration=duration||3800;
+  document.querySelectorAll('.hikari-msg-toast').forEach(function(e){e.remove();});
+  var d=document.createElement('div');
+  d.className='hikari-msg-toast';
+  d.innerHTML='<div class="hikari-msg-av"><img src="'+HIKARI_IMAGE+'" alt="ヒカリ" style="width:100%;height:100%;object-fit:contain;border-radius:50%"></div><div class="hikari-msg-body">'+text+'</div>';
+  document.body.appendChild(d);
+  setTimeout(function(){d.style.transition='opacity .4s ease';d.style.opacity='0';setTimeout(function(){if(d.parentNode)d.remove();},420);},duration);
+}
+var _hikariLvPrev=-1;
+function getHikariLevel(){
+  var total=Object.values(history).reduce(function(s,h){return s+h.correct+h.wrong;},0);
+  if(total>=1000)return 4;if(total>=600)return 3;if(total>=300)return 2;if(total>=100)return 1;return 0;
+}
+function updateHikariLevel(){
+  var lv=getHikariLevel();
+  var av=document.getElementById('dailyMsgAvDiv');
+  var crown=document.getElementById('hikariCrown');
+  if(av) av.className='daily-msg-avatar'+(lv>0?' hikari-av-lv'+lv:'');
+  if(crown) crown.style.display=lv>=4?'':'none';
+  if(_hikariLvPrev>=0&&lv>_hikariLvPrev){
+    var n=['','⭐ スター','✨ 輝き','🌈 オーラ','👑 マスター'];
+    setTimeout(function(){showToast('🎉 レベルアップ！ '+n[lv]+' Lv.'+lv);},500);
+    if(lv>=3) setTimeout(launchConfetti,900);
+  }
+  _hikariLvPrev=lv;
+}
+function updateStreakDisplay(){
+  var el=document.getElementById('streakHomeBadge');
+  if(!el) return;
+  var s=streakData.streak||0;
+  if(s>=2){el.textContent='🔥 '+s+'日連続学習中！';el.style.display='block';}
+  else el.style.display='none';
+}
 function showAnswerFeedback(correct){
   document.querySelectorAll('.answer-feedback-wrap').forEach(e=>e.remove());
   const wrap=document.createElement('div');
@@ -3444,7 +3495,12 @@ function answer(key){
   save();
   updateScoreBadge();
   updateDailyStats();
+  updateStreakDisplay();
+  updateHikariLevel();
   renderGoalBar();renderNoaCard();
+  var _ta2=(session.correct||0)+(session.wrong||0);
+  if(_ta2===20) setTimeout(function(){showHikariMsg('少し休もう。頑張りすぎも禁物だよ');},1600);
+  if(session.pool&&session.pool.length===5&&_ta2===5) setTimeout(function(){showHikariMsg('今日のミッション完了！お疲れ様');},1600);
   checkAchievements();
   if(session.mode==='mock'&&correct){
     if(q.category==='必修') session.hisshuCorrect=(session.hisshuCorrect||0)+1;
@@ -3461,6 +3517,7 @@ function answer(key){
     if(session.combo>bestCombo){bestCombo=session.combo;localStorage.setItem('np_best_combo',bestCombo);}
     const milestones=[3,5,10,15,20];
     if(milestones.includes(session.combo)) setTimeout(()=>{showToast(`🔥 ${session.combo}連続正解！コンボ継続中！`);if(session.combo>=5)launchConfetti();},100);
+    if(session.combo===3){var _cm=['止まらないね！この調子！','すごい、どんどん伸びてる！'];setTimeout(function(){showHikariMsg(_cm[Math.floor(Math.random()*2)]);},1300);}
   } else {
     session.combo=0;
     session.wrongStreak=(session.wrongStreak||0)+1;
@@ -6474,6 +6531,31 @@ initChips();
 initModeButtons();
 updateScoreBadge();
 initDailyMessage();
+updateHikariLevel();
+updateStreakDisplay();
+(function(){
+  var lastDate=streakData.lastDate||'';
+  var isNewDay=lastDate!==todayKey;
+  if(!lastDate){
+    setTimeout(function(){showHikariMsg('はじめまして！ヒカリだよ。一緒に頑張ろうね✨');},1800);
+  } else if(isNewDay){
+    var diffD=Math.round((new Date(todayKey)-new Date(lastDate))/86400000);
+    if(diffD>=3){
+      var ab=['また戻ってきてくれた。それだけで十分だよ','お疲れだったんだね。今日から一緒に再スタートしよう'];
+      setTimeout(function(){showHikariMsg(ab[Math.floor(Math.random()*2)]);},1800);
+    } else {
+      var gr=['待ってたよ。今日も一緒にやろう','今日も来てくれたね。うれしい','さあ、始めよう。あなたならできる'];
+      setTimeout(function(){showHikariMsg(gr[Math.floor(Math.random()*3)]);},1800);
+    }
+  } else {
+    var gr2=['待ってたよ。今日も一緒にやろう','今日も来てくれたね。うれしい','さあ、始めよう。あなたならできる'];
+    setTimeout(function(){showHikariMsg(gr2[Math.floor(Math.random()*3)]);},1800);
+  }
+  if(new Date().getHours()>=22){
+    var nm=['遅くまでお疲れ様。今日はここまでにしてもいいよ','無理しないでね。少しだけでも十分だよ'];
+    setTimeout(function(){showHikariMsg(nm[Math.floor(Math.random()*2)]);},5500);
+  }
+})();
 renderHomeSummary();
 updateBnWeakBadge();
 renderExamCountdown();
