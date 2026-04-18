@@ -3372,8 +3372,7 @@ function answer(key){
     <button id="flagBtn_${q.id}" onclick="flagQuestion(${q.id})" style="padding:5px 10px;background:${flaggedIds.has(q.id)?'rgba(239,68,68,0.12)':'rgba(240,232,222,0.8)'};color:${flaggedIds.has(q.id)?'#dc2626':'#8A6A50'};border:1px solid rgba(85,80,77,0.2);border-radius:16px;font-size:11px;cursor:pointer;font-family:'Noto Sans JP',sans-serif">${flaggedIds.has(q.id)?'🔖 フラグ済み':'🤔 難しかった'}</button>
     ${(()=>{const s=srsData[q.id];if(!s)return'';const due=new Date(s.due);const today2=new Date(todayKey);const diff=Math.round((due-today2)/(1000*60*60*24));const label=diff<=0?'今日':diff===1?'明日':`${diff}日後（${s.due.slice(5)}）`;return`<span style="font-size:10px;color:#8A6A50;padding:4px 8px;background:rgba(240,232,222,0.6);border-radius:10px;white-space:nowrap">📅 次回SRS: ${label}</span>`;})()}
     ${elapsedSec>=0.5?`<span style="font-size:10px;color:#8A6A50;padding:4px 8px;background:rgba(240,232,222,0.6);border-radius:10px;white-space:nowrap">⏱ ${elapsedSec}秒${(()=>{const avg=getAvgTime(q.id);return avg?` (平均${avg}秒)`:''})()}</span>`:''}
-    <button onclick="shareQuestion(${q.id})" style="padding:4px 9px;background:rgba(240,232,222,0.7);border:1px solid rgba(217,197,178,0.4);border-radius:10px;font-size:10px;color:#8A6A50;cursor:pointer;font-family:'Noto Sans JP',sans-serif;white-space:nowrap">📤 問題をシェア</button>
-    ${!correct&&history[q.id]&&history[q.id].wrong>0?`<button id="masterBtn_${q.id}" onclick="markMastered(${q.id})" style="padding:4px 9px;background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.35);border-radius:10px;font-size:10px;color:#16a34a;cursor:pointer;font-family:'Noto Sans JP',sans-serif;white-space:nowrap">✓ 克服済みにする</button>`:''}
+${!correct&&history[q.id]&&history[q.id].wrong>0?`<button id="masterBtn_${q.id}" onclick="markMastered(${q.id})" style="padding:4px 9px;background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.35);border-radius:10px;font-size:10px;color:#16a34a;cursor:pointer;font-family:'Noto Sans JP',sans-serif;white-space:nowrap">✓ 克服済みにする</button>`:''}
   </div>
   `;
   choices.after(res);
@@ -3621,8 +3620,7 @@ function finishQuiz(){
       })()}
       <button class="result-retry" onclick="retrySession()">もう一度やる</button>
       <button class="result-home" onclick="stopTts();backHome()">ホームへ戻る</button>
-      <button onclick="shareResult(${rate},${total},${session.correct})" style="width:100%;padding:12px;background:rgba(59,130,246,0.1);color:#1d4ed8;border:1.5px solid rgba(59,130,246,0.3);border-radius:14px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans JP',sans-serif;margin-bottom:8px">📤 結果をシェア</button>
-      ` + (quizMode!=='gachi'?`<button class="cal-btn" onclick="showCalModal('NursePass 看護師国試 学習', '正解率 ${rate}% (${total}問中${session.correct}問正解)')">📅 次の学習をカレンダーに追加</button>`:'') + `
+` + (quizMode!=='gachi'?`<button class="cal-btn" onclick="showCalModal('NursePass 看護師国試 学習', '正解率 ${rate}% (${total}問中${session.correct}問正解)')">📅 次の学習をカレンダーに追加</button>`:'') + `
       ${(()=>{
         // 次の学習提案
         const suggestions=[];
@@ -5112,7 +5110,6 @@ function renderStats(){
           <div style="font-size:9px;color:transparent;margin-top:3px">.</div>
         </div>
       </div>
-      <button onclick="shareWeeklyReport()" style="width:100%;margin-top:10px;padding:7px;background:rgba(255,255,255,0.6);border:1px solid rgba(184,160,144,0.35);border-radius:10px;font-size:11px;font-weight:700;color:#6B5040;cursor:pointer;font-family:'Noto Sans JP',sans-serif">📤 週次レポートをシェア</button>
     </div>`;
   })();
   sc.innerHTML=`
@@ -5430,11 +5427,6 @@ function renderStats(){
     ${renderStarsDiffStats()}
     ${renderQuestionsMap()}
     ${renderAccTrend()}
-    <div style="margin:12px 0;padding:12px 14px;background:rgba(240,232,222,0.5);border:1.5px solid rgba(217,197,178,0.35);border-radius:14px;text-align:center">
-      <div style="font-size:12px;font-weight:700;color:#B8907A;margin-bottom:8px">🏅 学習実績証明書</div>
-      <div style="font-size:11px;color:#8A6A50;margin-bottom:10px">今の成績をカード形式でシェアしよう</div>
-      <button onclick="shareAchievementCard()" style="width:100%;padding:10px;background:linear-gradient(135deg,rgba(253,230,138,0.3),rgba(217,160,96,0.2));border:1.5px solid rgba(217,160,96,0.4);border-radius:12px;font-size:13px;font-weight:700;color:#7C4A20;cursor:pointer;font-family:'Noto Sans JP',sans-serif">📜 実績証明書を生成・シェア</button>
-    </div>
     `;
 }
 
