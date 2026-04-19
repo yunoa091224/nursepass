@@ -387,6 +387,13 @@ body.font-xl .explanation{font-size:15px}
 .hikari-av-lv1{animation:lv1Spark 2.5s ease-in-out infinite;}
 .hikari-av-lv2{animation:lv2Gold 2s ease-in-out infinite;}
 .hikari-av-lv3,.hikari-av-lv4{animation:lv3Rainbow 3s linear infinite;}
+
+/* ===== LEVEL UP OVERLAY ===== */
+@keyframes lvUpZoom{0%{opacity:0;transform:translate(-50%,-50%) scale(.4);}40%{opacity:1;transform:translate(-50%,-50%) scale(1.1);}70%{transform:translate(-50%,-50%) scale(.96);}100%{opacity:1;transform:translate(-50%,-50%) scale(1);}}
+.lv-up-overlay{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:10000;text-align:center;pointer-events:none;animation:lvUpZoom .6s cubic-bezier(.17,.67,.35,1.3) forwards;opacity:0;}
+.lv-up-img{width:150px;height:150px;object-fit:contain;border-radius:50%;display:block;margin:0 auto 10px;}
+.lv-up-title{font-size:22px;font-weight:900;color:#FFD700;text-shadow:0 2px 10px rgba(0,0,0,.5);letter-spacing:.03em;margin-bottom:4px;}
+.lv-up-name{font-size:15px;font-weight:700;color:#fff;text-shadow:0 1px 5px rgba(0,0,0,.6);}
 </style>
 </head>
 <body ontouchstart="">
@@ -412,7 +419,9 @@ body.font-xl .explanation{font-size:15px}
     <div id="hikariHintBar" class="daily-msg-card" style="margin-bottom:12px">
       <div style="position:relative;flex-shrink:0"><div class="daily-msg-avatar" id="dailyMsgAvDiv"><img class="noa-av-img" id="dailyAvImg" src="" alt="ヒカリ"></div><span id="hikariCrown" style="display:none;position:absolute;top:-11px;left:50%;transform:translateX(-50%);font-size:15px;line-height:1;z-index:2">👑</span></div>
       <div class="daily-msg-content">
-        <div class="daily-msg-label">ヒカリより</div>
+        <div class="daily-msg-label">ヒカリより <span id="hikariLvBadge" style="background:rgba(138,106,80,0.15);color:#8A6A50;border-radius:8px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:4px">Lv.1</span></div>
+        <div id="hikariLvName" style="font-size:11px;color:#B8907A;font-weight:700;margin-bottom:3px">小さなヒカリ</div>
+        <div id="hikariLvNext" style="font-size:10px;color:#aaa;margin-bottom:3px"></div>
         <div class="daily-msg-text" id="dailyMsgText"></div>
         <div class="daily-msg-footer">
           <span class="daily-msg-date" id="dailyMsgDate"></span>
@@ -3393,33 +3402,76 @@ function renderQuestion(){
 }
 
 
+// ===== HIKARI LEVEL SYSTEM =====
+var HIKARI_IMG_PATHS=[
+  'images/hikari/hikari_lv1.png',
+  'images/hikari/hikari_lv2.png',
+  'images/hikari/hikari_lv3.png',
+  'images/hikari/hikari_lv4.png',
+  'images/hikari/hikari_lv5.png'
+];
+var HIKARI_LV_NAMES=['小さなヒカリ','めざめたヒカリ','かがやくヒカリ','うつくしいヒカリ','めがみヒカリ'];
+var HIKARI_LV_REQ=[0,100,300,600,1000];
+function getTotalAnswered(){
+  return Object.values(history).reduce(function(s,h){return s+h.correct+h.wrong;},0);
+}
+function getHikariLevel(){
+  var t=getTotalAnswered();
+  if(t>=1000)return 4;if(t>=600)return 3;if(t>=300)return 2;if(t>=100)return 1;return 0;
+}
+function getHikariImgSrc(){return HIKARI_IMG_PATHS[getHikariLevel()];}
+var _hikariLvPrev=-1;
+function updateHikariLevel(){
+  var lv=getHikariLevel();
+  var t=getTotalAnswered();
+  // avatar effect class
+  var av=document.getElementById('dailyMsgAvDiv');
+  var crown=document.getElementById('hikariCrown');
+  if(av) av.className='daily-msg-avatar'+(lv>0?' hikari-av-lv'+lv:'');
+  if(crown) crown.style.display=lv>=4?'':'none';
+  // image swap
+  var src=HIKARI_IMG_PATHS[lv];
+  var imgs=['dailyAvImg','noaAvLg'];
+  imgs.forEach(function(id){var e=document.getElementById(id);if(e)e.src=src;});
+  // badge and name
+  var badge=document.getElementById('hikariLvBadge');
+  var nameEl=document.getElementById('hikariLvName');
+  var nextEl=document.getElementById('hikariLvNext');
+  if(badge) badge.textContent='Lv.'+(lv+1);
+  if(nameEl) nameEl.textContent=HIKARI_LV_NAMES[lv];
+  if(nextEl){
+    if(lv<4){var rem=HIKARI_LV_REQ[lv+1]-t;nextEl.textContent='Lv.'+(lv+2)+'まであと'+rem+'問';}
+    else{nextEl.textContent='最高レベル達成！';}
+  }
+  // level-up event
+  if(_hikariLvPrev>=0&&lv>_hikariLvPrev) showLevelUp(lv);
+  _hikariLvPrev=lv;
+}
+function showLevelUp(lv){
+  document.querySelectorAll('.lv-up-overlay').forEach(function(e){e.remove();});
+  var o=document.createElement('div');
+  o.className='lv-up-overlay';
+  o.innerHTML='<div style="background:rgba(0,0,0,.55);border-radius:24px;padding:28px 32px;backdrop-filter:blur(8px)">'
+    +'<img class="lv-up-img" src="'+HIKARI_IMG_PATHS[lv]+'" alt="ヒカリ">'
+    +'<div class="lv-up-title">✨ ヒカリがレベルアップ！ ✨</div>'
+    +'<div class="lv-up-name">Lv.'+(lv+1)+' '+HIKARI_LV_NAMES[lv]+'</div>'
+    +'</div>';
+  document.body.appendChild(o);
+  setTimeout(function(){
+    o.style.transition='opacity .5s ease';o.style.opacity='0';
+    setTimeout(function(){if(o.parentNode)o.remove();},500);
+  },3000);
+  setTimeout(launchConfetti,400);if(lv>=3)setTimeout(launchConfetti,900);
+}
 // ===== HIKARI SCENE MESSAGES =====
 function showHikariMsg(text,duration){
   duration=duration||3800;
   document.querySelectorAll('.hikari-msg-toast').forEach(function(e){e.remove();});
   var d=document.createElement('div');
   d.className='hikari-msg-toast';
-  d.innerHTML='<div class="hikari-msg-av"><img src="'+HIKARI_IMAGE+'" alt="ヒカリ" style="width:100%;height:100%;object-fit:contain;border-radius:50%"></div><div class="hikari-msg-body">'+text+'</div>';
+  d.innerHTML='<div class="hikari-msg-av"><img src="'+getHikariImgSrc()+'" alt="ヒカリ" style="width:100%;height:100%;object-fit:contain;border-radius:50%"></div><div class="hikari-msg-body">'+text+'</div>';
   document.body.appendChild(d);
   setTimeout(function(){d.style.transition='opacity .4s ease';d.style.opacity='0';setTimeout(function(){if(d.parentNode)d.remove();},420);},duration);
-}
-var _hikariLvPrev=-1;
-function getHikariLevel(){
-  var total=Object.values(history).reduce(function(s,h){return s+h.correct+h.wrong;},0);
-  if(total>=1000)return 4;if(total>=600)return 3;if(total>=300)return 2;if(total>=100)return 1;return 0;
-}
-function updateHikariLevel(){
-  var lv=getHikariLevel();
-  var av=document.getElementById('dailyMsgAvDiv');
-  var crown=document.getElementById('hikariCrown');
-  if(av) av.className='daily-msg-avatar'+(lv>0?' hikari-av-lv'+lv:'');
-  if(crown) crown.style.display=lv>=4?'':'none';
-  if(_hikariLvPrev>=0&&lv>_hikariLvPrev){
-    var n=['','⭐ スター','✨ 輝き','🌈 オーラ','👑 マスター'];
-    setTimeout(function(){showToast('🎉 レベルアップ！ '+n[lv]+' Lv.'+lv);},500);
-    if(lv>=3) setTimeout(launchConfetti,900);
-  }
-  _hikariLvPrev=lv;
 }
 function updateStreakDisplay(){
   var el=document.getElementById('streakHomeBadge');
@@ -5800,7 +5852,7 @@ function createMiniChat(q){
   div.id='miniChat';
   div.innerHTML=
     '<div class="mini-chat-hd" onclick="toggleMiniChat()">'+
-      '<div class="mini-av-sm"><img class="noa-av-img" src="'+HIKARI_IMAGE+'" alt="ヒカリ"></div>'+
+      '<div class="mini-av-sm"><img class="noa-av-img" src="'+getHikariImgSrc()+'" alt="ヒカリ"></div>'+
       '<div class="mini-chat-lbl">ヒカリに質問する</div>'+
       '<div class="mini-chat-arr" id="miniArr">▼</div>'+
     '</div>'+
@@ -5830,7 +5882,7 @@ function appendMiniMsg(role,text){
   const list=document.getElementById('miniMsgList');
   if(!list) return;
   const isN=role==='noa';
-  const av=isN?'<div class="mini-av-xs"><img class="noa-av-img" src="'+HIKARI_IMAGE+'" alt="ヒカリ"></div>':'';
+  const av=isN?'<div class="mini-av-xs"><img class="noa-av-img" src="'+getHikariImgSrc()+'" alt="ヒカリ"></div>':'';
   const txt=text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
   const row=document.createElement('div');
   row.className='mini-row '+(isN?'n':'u');
@@ -5858,7 +5910,7 @@ async function sendMiniChat(){
   const typing=document.createElement('div');
   typing.id='miniTyping';
   typing.className='mini-row n';
-  typing.innerHTML='<div class="mini-av-xs"><img class="noa-av-img" src="'+HIKARI_IMAGE+'" alt="ヒカリ"></div><div class="mini-bbl"><div class="typing-wrap"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div></div>';
+  typing.innerHTML='<div class="mini-av-xs"><img class="noa-av-img" src="'+getHikariImgSrc()+'" alt="ヒカリ"></div><div class="mini-bbl"><div class="typing-wrap"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div></div>';
   list.appendChild(typing);
   list.scrollTop=list.scrollHeight;
   const sysP='あなたは看護師国家試験対策アプリNursePassのAIコーチ「ヒカリ」です。\n現在の問題:【'+miniCtx.field+'】'+miniCtx.question+'\n解説:'+miniCtx.explanation+'\nこの問題に関連した学生の質問に、200文字以内で温かく、わかりやすく答えてください。';
@@ -5925,7 +5977,7 @@ function renderChat(){
   if(!el) return;
   el.innerHTML=chatHistory.map(m=>{
     const isNoa=m.role==='noa';
-    const av=isNoa?'<div class="chat-av"><img class="noa-av-img" src="'+HIKARI_IMAGE+'" alt="ヒカリ"></div>':'';
+    const av=isNoa?'<div class="chat-av"><img class="noa-av-img" src="'+getHikariImgSrc()+'" alt="ヒカリ"></div>':'';
     const txt=m.text.replace(/\n/g,'<br>').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/&lt;br&gt;/g,'<br>');
     return '<div class="chat-row '+(isNoa?'noa-row':'user-row')+'">'+av+'<div class="chat-bubble">'+txt+'</div></div>';
   }).join('');
@@ -5955,7 +6007,7 @@ async function sendChat(){
   const typing=document.createElement('div');
   typing.id='typingIndicator';
   typing.className='chat-row noa-row';
-  typing.innerHTML='<div class="chat-av"><img class="noa-av-img" src="'+HIKARI_IMAGE+'" alt="ヒカリ"></div><div class="chat-bubble"><div class="typing-wrap"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div></div>';
+  typing.innerHTML='<div class="chat-av"><img class="noa-av-img" src="'+getHikariImgSrc()+'" alt="ヒカリ"></div><div class="chat-bubble"><div class="typing-wrap"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div></div>';
   hist.appendChild(typing);
   hist.scrollTop=hist.scrollHeight;
   try{
@@ -6440,7 +6492,7 @@ const DAILY_MESSAGES = {
 };
 
 function initDailyMessage(){
-  const _setAv=id=>{const el=document.getElementById(id);if(el)el.src=HIKARI_IMAGE;};
+  const _setAv=id=>{const el=document.getElementById(id);if(el)el.src=HIKARI_IMG_PATHS[getHikariLevel()];};
   _setAv("dailyAvImg");_setAv("noaAvLg");
   const today=new Date();
   const m=today.getMonth()+1;
